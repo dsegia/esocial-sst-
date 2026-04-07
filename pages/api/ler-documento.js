@@ -1,19 +1,17 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
 
-  const { paginas, tipo } = req.body
-  if (!paginas || paginas.length === 0) return res.status(400).json({ erro: 'Nenhuma página enviada' })
+  const { paginas, texto_pdf, tipo } = req.body
 
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return res.status(500).json({ erro: 'GEMINI_API_KEY não configurada na Vercel' })
 
-  const prompts = {
-    aso: `Analise este ASO (Atestado de Saúde Ocupacional) brasileiro e extraia os dados.
-IMPORTANTE: Responda APENAS com o JSON abaixo, sem nenhum texto antes ou depois, sem markdown, sem blocos de código.
+  const prompt_aso = `Analise este ASO (Atestado de Saúde Ocupacional) brasileiro e extraia os dados.
+Responda APENAS com JSON válido, sem markdown, sem texto antes ou depois.
 {
   "funcionario": {
-    "nome": "nome completo do trabalhador ou null",
-    "cpf": "CPF formatado 000.000.000-00 ou null",
+    "nome": "nome completo ou null",
+    "cpf": "000.000.000-00 ou null",
     "data_nasc": "DD/MM/AAAA ou null",
     "data_adm": "DD/MM/AAAA ou null",
     "matricula": "matrícula ou null",
@@ -25,47 +23,60 @@ IMPORTANTE: Responda APENAS com o JSON abaixo, sem nenhum texto antes ou depois,
     "data_exame": "DD/MM/AAAA ou null",
     "prox_exame": "DD/MM/AAAA ou null",
     "conclusao": "apto ou inapto ou apto_restricao",
-    "medico_nome": "nome do médico ou null",
-    "medico_crm": "número CRM ou null"
+    "medico_nome": "nome ou null",
+    "medico_crm": "CRM ou null"
   },
-  "exames": [{"nome": "nome", "resultado": "Normal ou Alterado ou Pendente"}],
+  "exames": [{"nome": "exame", "resultado": "Normal ou Alterado ou Pendente"}],
   "riscos": [],
-  "confianca": {"nome": 85, "cpf": 85, "tipo_aso": 80, "data_exame": 90, "conclusao": 85, "medico_crm": 75}
-}`,
-    ltcat: `Analise este LTCAT (Laudo Técnico das Condições Ambientais do Trabalho) brasileiro.
-IMPORTANTE: Responda APENAS com o JSON abaixo, sem nenhum texto antes ou depois, sem markdown.
+  "confianca": {"nome": 85, "cpf": 85, "tipo_aso": 80, "data_exame": 90, "conclusao": 85}
+}`
+
+  const prompt_ltcat = `Analise este LTCAT brasileiro e extraia os dados.
+Responda APENAS com JSON válido, sem markdown, sem texto antes ou depois.
 {
   "dados_gerais": {
     "data_emissao": "DD/MM/AAAA ou null",
     "data_vigencia": "DD/MM/AAAA ou null",
     "prox_revisao": "DD/MM/AAAA ou null",
-    "resp_nome": "nome do responsável ou null",
+    "resp_nome": "nome ou null",
     "resp_conselho": "CREA ou CRQ ou CRM",
     "resp_registro": "número ou null"
   },
   "ghes": [{
-    "nome": "nome do GHE",
-    "setor": "setor",
-    "qtd_trabalhadores": 1,
+    "nome": "GHE", "setor": "setor", "qtd_trabalhadores": 1,
     "aposentadoria_especial": false,
-    "agentes": [{"tipo": "fis", "nome": "agente", "valor": "medição", "limite": "LT", "supera_lt": false}],
-    "epc": [{"nome": "EPC", "eficaz": true}],
-    "epi": [{"nome": "EPI", "ca": "CA", "eficaz": true}]
+    "agentes": [{"tipo": "fis", "nome": "agente", "valor": "v", "limite": "l", "supera_lt": false}],
+    "epc": [], "epi": []
   }],
   "confianca": {"data_emissao": 90, "resp_nome": 90, "ghes": 75}
 }`
-  }
+
+  const promptBase = tipo === 'ltcat' ? prompt_ltcat : prompt_aso
 
   try {
-    const parts = [
-      ...paginas.map(b64 => ({
-        inlineData: { mimeType: 'image/jpeg', data: b64 }
-      })),
-      { text: prompts[tipo] || prompts.aso }
-    ]
+    let parts = []
+
+    // MODO 1: texto extraído do PDF (PDF digital — melhor qualidade)
+    if (texto_pdf && texto_pdf.length > 50) {
+      parts = [{ text: `${promptBase}\n\nTEXTO DO DOCUMENTO:\n${texto_pdf.substring(0, 8000)}` }]
+    }
+    // MODO 2: imagens (PDF scan)
+    else if (paginas && paginas.length > 0) {
+      parts = [
+        ...paginas.map(b64 => ({ inlineData: { mimeType: 'image/jpeg', data: b64 } })),
+        { text: promptBase }
+      ]
+    } else {
+      return res.status(400).json({ erro: 'Nenhum conteúdo enviado' })
+    }
+
+    // Gemini 2.0 Flash para texto, 2.5 Flash para imagens
+    const modelo = (texto_pdf && texto_pdf.length > 50)
+      ? 'gemini-2.0-flash'
+      : 'gemini-2.5-flash'
 
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
       {
         method: 'POST',
         headers: {
@@ -74,54 +85,42 @@ IMPORTANTE: Responda APENAS com o JSON abaixo, sem nenhum texto antes ou depois,
         },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: {
-            temperature: 0,
-            maxOutputTokens: 2000,
-            responseMimeType: 'application/json',
-          }
+          generationConfig: { temperature: 0, maxOutputTokens: 2000 }
         })
       }
     )
 
     if (!response.ok) {
       const errText = await response.text()
-      return res.status(500).json({ erro: 'Erro na API Gemini: ' + errText })
+      return res.status(500).json({ erro: 'Erro Gemini: ' + errText })
     }
 
     const data = await response.json()
-
-    // Extrai texto de todos os parts (incluindo thinking)
     const texto = (data.candidates?.[0]?.content?.parts || [])
       .filter(p => p.text)
       .map(p => p.text)
       .join('')
 
-    // Parser robusto — tenta encontrar JSON dentro do texto
+    // Parser robusto
     let resultado
-    try {
-      // Tenta parse direto primeiro
-      resultado = JSON.parse(texto.trim())
-    } catch {
-      // Busca o primeiro bloco JSON válido no texto
-      const match = texto.match(/\{[\s\S]*\}/)
-      if (match) {
-        try {
-          resultado = JSON.parse(match[0])
-        } catch {
-          return res.status(500).json({
-            erro: 'Não foi possível extrair os dados do documento. O PDF pode estar muito borrado ou com baixa qualidade.',
-            debug: texto.substring(0, 500)
-          })
-        }
-      } else {
-        return res.status(500).json({
-          erro: 'Gemini não retornou dados estruturados. Tente com outro PDF.',
-          debug: texto.substring(0, 500)
-        })
-      }
+    const tentativas = [
+      () => JSON.parse(texto.trim()),
+      () => JSON.parse(texto.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()),
+      () => { const m = texto.match(/\{[\s\S]*\}/); if(m) return JSON.parse(m[0]); throw new Error('no match') }
+    ]
+
+    for (const fn of tentativas) {
+      try { resultado = fn(); break } catch {}
     }
 
-    return res.status(200).json({ sucesso: true, dados: resultado })
+    if (!resultado) {
+      return res.status(500).json({
+        erro: 'Não foi possível extrair dados. PDF pode estar ilegível.',
+        debug: texto.substring(0, 400)
+      })
+    }
+
+    return res.status(200).json({ sucesso: true, dados: resultado, modo: texto_pdf ? 'texto' : 'imagem' })
 
   } catch (err) {
     return res.status(500).json({ erro: 'Erro interno: ' + err.message })
