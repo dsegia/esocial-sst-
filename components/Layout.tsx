@@ -8,32 +8,39 @@ const supabase = createClient(
 )
 
 const MENU = [
-  { href:'/dashboard',    label:'Dashboard',             icon:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
-  { href:'/funcionarios', label:'Funcionários',           icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z' },
-  { href:'/leitor',       label:'Leitor PDF/XML',         icon:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12' },
-  { sep: true, label: 'DOCUMENTOS SST' },
-  { href:'/ltcat',        label:'LTCAT',                  icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
-  { href:'/pcmso',        label:'PCMSO',                  icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
-  { sep: true, label: 'TRANSMISSÕES' },
-  { href:'/s2220',        label:'S-2220 Monit. Saúde',    icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
-  { href:'/s2240',        label:'S-2240 Cond. Ambientais',icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
-  { href:'/s2210',        label:'S-2210 CAT',             icon:'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01' },
-  { sep: true, label: 'GESTÃO' },
-  { href:'/historico',    label:'Histórico',              icon:'M22 12h-4l-3 9L9 3l-3 9H2' },
-  { href:'/alertas',      label:'Alertas',                icon:'M12 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zM12 6v6l4 2' },
+  { href:'/dashboard',      label:'Dashboard',              icon:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
+  { href:'/funcionarios',   label:'Funcionários',            icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z' },
+  { href:'/leitor',         label:'Leitor PDF/XML',          icon:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12' },
+  { sep:true, label:'DOCUMENTOS SST' },
+  { href:'/ltcat',          label:'LTCAT',                   icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
+  { href:'/pcmso',          label:'PCMSO',                   icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
+  { sep:true, label:'TRANSMISSÕES' },
+  { href:'/s2220',          label:'S-2220 Monit. Saúde',     icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
+  { href:'/s2240',          label:'S-2240 Cond. Ambientais', icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
+  { href:'/s2210',          label:'S-2210 CAT',              icon:'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01' },
+  { sep:true, label:'GESTÃO' },
+  { href:'/historico',      label:'Histórico',               icon:'M22 12h-4l-3 9L9 3l-3 9H2' },
+  { href:'/alertas',        label:'Alertas',                 icon:'M12 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zM12 6v6l4 2' },
+  { href:'/configuracoes',  label:'Configurações',           icon:'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z' },
 ]
 
 export default function Layout({ children, pagina }) {
   const router = useRouter()
   const [nomeEmpresa, setNomeEmpresa] = useState('')
   const [nomeUser, setNomeUser] = useState('')
+  const [semCert, setSemCert] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
-      supabase.from('usuarios').select('nome, empresas(razao_social)').eq('id', session.user.id).single()
+      supabase.from('usuarios').select('nome, empresa_id, empresas(razao_social, cert_digital_validade)')
+        .eq('id', session.user.id).single()
         .then(({ data }) => {
-          if (data) { setNomeUser(data.nome); setNomeEmpresa(data.empresas?.razao_social || '') }
+          if (data) {
+            setNomeUser(data.nome)
+            setNomeEmpresa(data.empresas?.razao_social || '')
+            setSemCert(!data.empresas?.cert_digital_validade)
+          }
         })
     })
   }, [])
@@ -44,7 +51,6 @@ export default function Layout({ children, pagina }) {
     <div style={{ display:'flex', minHeight:'100vh', background:'#f4f6f9', fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <div style={{ width:230, flexShrink:0, background:'#fff', borderRight:'0.5px solid #e5e7eb', display:'flex', flexDirection:'column', padding:'1.25rem 0' }}>
 
-        {/* Logo */}
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 1.25rem 1.25rem', borderBottom:'0.5px solid #e5e7eb', marginBottom:'1rem' }}>
           <div style={{ width:36, height:36, background:'#185FA5', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
@@ -58,7 +64,6 @@ export default function Layout({ children, pagina }) {
           </div>
         </div>
 
-        {/* Nav */}
         <nav style={{ flex:1, padding:'0 .75rem', overflowY:'auto' }}>
           {MENU.map((item, i) => {
             if (item.sep) return (
@@ -67,6 +72,7 @@ export default function Layout({ children, pagina }) {
               </div>
             )
             const ativo = pagina === item.href.replace('/','')
+            const isCfg = item.href === '/configuracoes'
             return (
               <a key={item.href} href={item.href} style={{
                 display:'flex', alignItems:'center', gap:8,
@@ -75,21 +81,24 @@ export default function Layout({ children, pagina }) {
                 background: ativo ? '#E6F1FB' : 'transparent',
                 color: ativo ? '#185FA5' : '#374151',
                 fontWeight: ativo ? 500 : 400,
+                position:'relative',
               }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                   stroke={ativo ? '#185FA5' : '#9ca3af'} strokeWidth="2" style={{ flexShrink:0 }}>
                   <path d={item.icon}/>
                 </svg>
                 <span style={{ lineHeight:1.3 }}>{item.label}</span>
+                {isCfg && semCert && (
+                  <span style={{ marginLeft:'auto', width:7, height:7, borderRadius:'50%', background:'#EF9F27', flexShrink:0 }}></span>
+                )}
               </a>
             )
           })}
         </nav>
 
-        {/* Footer */}
         <div style={{ padding:'1rem 1.25rem 0', borderTop:'0.5px solid #e5e7eb', marginTop:'1rem' }}>
           <div style={{ fontSize:12, fontWeight:500, color:'#374151', marginBottom:1 }}>{nomeUser}</div>
-          <div style={{ fontSize:11, color:'#6b7280', marginBottom:10 }}>{nomeEmpresa}</div>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:10, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{nomeEmpresa}</div>
           <button onClick={sair} style={{ width:'100%', padding:'7px', background:'transparent', border:'0.5px solid #d1d5db', borderRadius:8, fontSize:12, color:'#6b7280', cursor:'pointer' }}>
             Sair
           </button>
