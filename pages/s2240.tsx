@@ -13,25 +13,12 @@ export default function S2240() {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState('')
   const [funcionarios, setFuncionarios] = useState([])
+  const [ltcatAtivo, setLtcatAtivo] = useState(null)
+  const [transmissoes, setTransmissoes] = useState([])
   const [carregando, setCarregando] = useState(true)
-  const [salvando, setSalvando] = useState(false)
+  const [filtro, setFiltro] = useState('todos')
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
-  const [form, setForm] = useState({
-    funcionario_id: '',
-    data_emissao: '',
-    data_vigencia: '',
-    prox_revisao: '',
-    resp_nome: '',
-    resp_conselho: 'CREA',
-    resp_registro: '',
-  })
-  const [ghes, setGhes] = useState([
-    { nome: 'GHE 01', setor: '', qtd_trabalhadores: 1, aposentadoria_especial: false,
-      agentes: [{ tipo: 'fis', nome: 'Ruído', valor: '', limite: '85 dB(A)', supera_lt: false }],
-      epc: [{ nome: '', eficaz: true }],
-      epi: [{ nome: '', ca: '', eficaz: true }] }
-  ])
 
   useEffect(() => { init() }, [])
 
@@ -41,186 +28,308 @@ export default function S2240() {
     const { data: user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
     setEmpresaId(user.empresa_id)
-    const { data: funcs } = await supabase.from('funcionarios').select('id,nome,matricula_esocial,setor').eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome')
-    setFuncionarios(funcs || [])
+
+    const [funcsRes, ltcatRes, txRes] = await Promise.all([
+      supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc').eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome'),
+      supabase.from('ltcats').select('*').eq('empresa_id', user.empresa_id).eq('ativo', true).order('data_emissao', { ascending: false }).limit(1).single(),
+      supabase.from('transmissoes').select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em,erro_descricao').eq('empresa_id', user.empresa_id).eq('evento', 'S-2240').order('criado_em', { ascending: false }),
+    ])
+
+    setFuncionarios(funcsRes.data || [])
+    setLtcatAtivo(ltcatRes.data || null)
+    setTransmissoes(txRes.data || [])
     setCarregando(false)
   }
 
-  function updGhe(i, campo, val) { const g = [...ghes]; g[i][campo] = val; setGhes(g) }
-  function addGhe() { setGhes([...ghes, { nome: 'GHE 0'+(ghes.length+1), setor:'', qtd_trabalhadores:1, aposentadoria_especial:false, agentes:[{tipo:'fis',nome:'',valor:'',limite:'',supera_lt:false}], epc:[{nome:'',eficaz:true}], epi:[{nome:'',ca:'',eficaz:true}] }]) }
-  function remGhe(i) { if(ghes.length>1) setGhes(ghes.filter((_,idx)=>idx!==i)) }
+  function ultimaTx(funcId) {
+    return transmissoes.filter(t => t.funcionario_id === funcId)[0] || null
+  }
 
-  async function salvar(e) {
-    e.preventDefault(); setErro(''); setSucesso(''); setSalvando(true)
-    if (!form.funcionario_id) { setErro('Selecione o funcionário.'); setSalvando(false); return }
-    if (!form.data_emissao) { setErro('Informe a data de emissão do LTCAT.'); setSalvando(false); return }
+  // GHE do funcionário baseado no setor
+  function gheDoFuncionario(func) {
+    if (!ltcatAtivo?.ghes) return null
+    for (const ghe of ltcatAtivo.ghes) {
+      const setorGHE  = (ghe.setor||'').toLowerCase()
+      const setorFunc = (func.setor||'').toLowerCase()
+      if (setorGHE && setorFunc && (setorGHE.includes(setorFunc) || setorFunc.includes(setorGHE))) {
+        return ghe
+      }
+    }
+    // Se só tem um GHE, assume que é dele
+    if (ltcatAtivo.ghes.length === 1) return ltcatAtivo.ghes[0]
+    return null
+  }
 
-    const { data: ltcat, error: ltErr } = await supabase.from('ltcats').insert({
+  function statusFuncionario(func) {
+    const tx  = ultimaTx(func.id)
+    const ghe = gheDoFuncionario(func)
+    const dadosOk = func.data_adm && func.data_nasc && func.matricula_esocial && !func.matricula_esocial.startsWith('PEND-')
+
+    if (!ltcatAtivo) return { label:'Sem LTCAT', cor:'#E24B4A', bg:'#FCEBEB', pode:false, motivo:'Nenhum LTCAT ativo cadastrado' }
+    if (!dadosOk)    return { label:'Dados incompletos', cor:'#EF9F27', bg:'#FAEEDA', pode:false, motivo:'Faltam: admissão, nascimento ou matrícula eSocial' }
+
+    if (!tx) return { label:'Não transmitido', cor:'#EF9F27', bg:'#FAEEDA', pode:true, motivo:'S-2240 ainda não enviado para este funcionário' }
+    if (tx.status === 'enviado')   return { label:'Transmitido', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:`Recibo: ${tx.recibo||'—'}` }
+    if (tx.status === 'pendente')  return { label:'Pendente', cor:'#EF9F27', bg:'#FAEEDA', pode:true, motivo:'Aguardando transmissão' }
+    if (tx.status === 'rejeitado') return { label:'Rejeitado', cor:'#E24B4A', bg:'#FCEBEB', pode:true, motivo: tx.erro_descricao || 'Verifique o erro e retransmita' }
+
+    return { label:'Em dia', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:'' }
+  }
+
+  async function criarTransmissao(funcId) {
+    const { error } = await supabase.from('transmissoes').insert({
       empresa_id: empresaId,
-      data_emissao: form.data_emissao,
-      data_vigencia: form.data_vigencia || form.data_emissao,
-      prox_revisao: form.prox_revisao || null,
-      resp_nome: form.resp_nome,
-      resp_conselho: form.resp_conselho,
-      resp_registro: form.resp_registro,
-      ghes: ghes,
-      ativo: true,
-    }).select().single()
-
-    if (ltErr) { setErro('Erro ao salvar: ' + ltErr.message); setSalvando(false); return }
-
-    await supabase.from('transmissoes').insert({
-      empresa_id: empresaId,
-      funcionario_id: form.funcionario_id,
+      funcionario_id: funcId,
       evento: 'S-2240',
-      referencia_id: ltcat.id,
+      referencia_id: ltcatAtivo.id,
       referencia_tipo: 'ltcat',
       status: 'pendente',
       tentativas: 0,
       ambiente: 'producao_restrita',
     })
-
-    setSucesso('LTCAT salvo! Transmissão S-2240 criada como pendente.')
-    setSalvando(false)
+    if (error) { setErro('Erro ao criar transmissão: ' + error.message); return }
+    setSucesso('Transmissão S-2240 criada. Acesse Transmissão para enviar.')
+    init()
   }
 
-  const inp = { width:'100%', padding:'8px 10px', fontSize:13, border:'1px solid #d1d5db', borderRadius:8, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' }
-  const lbl = { display:'block', fontSize:12, fontWeight:500, color:'#374151', marginBottom:4 }
-  const card = { background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, padding:'1.25rem', marginBottom:'1rem' }
+  async function criarParaTodos() {
+    const semTx = funcsFiltradas.filter(f => {
+      const st = statusFuncionario(f)
+      return st.label === 'Não transmitido' && !statusFuncionario(f).pode === false
+    }).filter(f => statusFuncionario(f).pode)
 
-  if (carregando) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' }}>Carregando...</div>
+    for (const f of semTx) {
+      await criarTransmissao(f.id)
+    }
+    setSucesso(`${semTx.length} transmissão(ões) S-2240 criada(s). Acesse Transmissão para enviar.`)
+  }
+
+  const funcsFiltradas = funcionarios.filter(f => {
+    const st = statusFuncionario(f)
+    if (filtro === 'todos') return true
+    if (filtro === 'pendente') return st.pode
+    if (filtro === 'ok') return st.label === 'Transmitido'
+    if (filtro === 'problema') return ['Sem LTCAT','Dados incompletos','Rejeitado'].includes(st.label)
+    return true
+  })
+
+  const prontos   = funcionarios.filter(f => statusFuncionario(f).pode)
+  const problemas = funcionarios.filter(f => ['Sem LTCAT','Dados incompletos','Rejeitado'].includes(statusFuncionario(f).label))
+
+  if (carregando) return <div style={s.loading}>Carregando...</div>
 
   return (
     <Layout pagina="s2240">
-      <Head><title>S-2240 LTCAT — eSocial SST</title></Head>
+      <Head><title>S-2240 — eSocial SST</title></Head>
 
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1.25rem' }}>
+      <div style={s.header}>
         <div>
-          <div style={{ fontSize:20, fontWeight:700, color:'#111' }}>S-2240 — LTCAT</div>
-          <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>Condições Ambientais de Trabalho · NR-9</div>
+          <div style={s.titulo}>S-2240 — Condições Ambientais do Trabalho</div>
+          <div style={s.sub}>{prontos.length} funcionário(s) com transmissão pendente · {problemas.length} com problema</div>
         </div>
-        <span style={{ background:'#FAEEDA', color:'#633806', padding:'4px 12px', borderRadius:99, fontSize:12, fontWeight:600 }}>S-2240</span>
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={s.btnOutline} onClick={() => router.push('/ltcat')}>Ver LTCAT</button>
+          {prontos.length > 0 && (
+            <button style={s.btnPrimary} onClick={() => router.push('/transmissao-manual')}>
+              📡 Transmitir pendentes ({prontos.length})
+            </button>
+          )}
+        </div>
       </div>
 
-      {sucesso && <div style={{ background:'#EAF3DE', color:'#27500A', border:'0.5px solid #C0DD97', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:14 }}>{sucesso} <a href="/historico" style={{ color:'#085041', fontWeight:500 }}>Ver histórico →</a></div>}
-      {erro && <div style={{ background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:14 }}>{erro}</div>}
+      {sucesso && <div style={s.sucessoBox}>{sucesso}</div>}
+      {erro    && <div style={s.erroBox}>{erro}</div>}
 
-      <form onSubmit={salvar}>
-        <div style={card}>
-          <div style={{ fontSize:13, fontWeight:600, color:'#111', marginBottom:14 }}>Funcionário e dados gerais</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
-            <div><label style={lbl}>Funcionário *</label>
-              <select style={inp} value={form.funcionario_id} onChange={e => setForm({...form, funcionario_id:e.target.value})} required>
-                <option value="">Selecione...</option>
-                {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome} — {f.matricula_esocial}</option>)}
-              </select>
-            </div>
-            <div><label style={lbl}>Data de emissão *</label>
-              <input type="date" style={inp} value={form.data_emissao} onChange={e => setForm({...form, data_emissao:e.target.value})} required />
-            </div>
+      {/* Status LTCAT */}
+      {ltcatAtivo ? (
+        <div style={{ background:'#EAF3DE', border:'0.5px solid #C0DD97', borderRadius:10, padding:'10px 16px', marginBottom:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontSize:13, color:'#085041' }}>
+            ✓ LTCAT ativo: emitido em <strong>{new Date(ltcatAtivo.data_emissao+'T12:00:00').toLocaleDateString('pt-BR')}</strong>
+            · {ltcatAtivo.ghes?.length||0} GHE(s)
+            · Resp: {ltcatAtivo.resp_nome||'—'}
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
-            <div><label style={lbl}>Início da vigência</label>
-              <input type="date" style={inp} value={form.data_vigencia} onChange={e => setForm({...form, data_vigencia:e.target.value})} />
-            </div>
-            <div><label style={lbl}>Próxima revisão</label>
-              <input type="date" style={inp} value={form.prox_revisao} onChange={e => setForm({...form, prox_revisao:e.target.value})} />
-            </div>
+          <button style={{ ...s.btnOutline, padding:'4px 10px', fontSize:12 }} onClick={() => router.push('/ltcat')}>
+            Editar LTCAT →
+          </button>
+        </div>
+      ) : (
+        <div style={{ background:'#FCEBEB', border:'1px solid #E24B4A', borderRadius:10, padding:'12px 16px', marginBottom:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontSize:13, color:'#791F1F' }}>
+            ⚠ Nenhum LTCAT ativo. O S-2240 requer um LTCAT cadastrado para identificar os agentes de risco.
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', gap:10 }}>
-            <div><label style={lbl}>Responsável técnico *</label>
-              <input style={inp} placeholder="Nome do engenheiro/técnico" value={form.resp_nome} onChange={e => setForm({...form, resp_nome:e.target.value})} />
-            </div>
-            <div><label style={lbl}>Conselho</label>
-              <select style={{...inp, width:90}} value={form.resp_conselho} onChange={e => setForm({...form, resp_conselho:e.target.value})}>
-                <option>CREA</option><option>CRQ</option><option>CRM</option>
-              </select>
-            </div>
-            <div><label style={lbl}>Registro</label>
-              <input style={inp} placeholder="123456-D/SP" value={form.resp_registro} onChange={e => setForm({...form, resp_registro:e.target.value})} />
-            </div>
+          <button style={s.btnPrimary} onClick={() => router.push('/ltcat')}>Cadastrar LTCAT →</button>
+        </div>
+      )}
+
+      {/* Ação em massa */}
+      {prontos.length > 0 && ltcatAtivo && (
+        <div style={{ background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:10, padding:'10px 16px', marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ fontSize:13, color:'#374151' }}>
+            <strong style={{ color:'#EF9F27' }}>{prontos.length}</strong> funcionário(s) precisam ter S-2240 transmitido
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button style={s.btnOutline} onClick={criarParaTodos}>
+              Criar transmissões para todos
+            </button>
+            <button style={s.btnPrimary} onClick={() => router.push('/transmissao-manual')}>
+              📡 Ir para transmissão
+            </button>
           </div>
         </div>
+      )}
 
-        <div style={card}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'#111' }}>GHEs — Grupos Homogêneos de Exposição</div>
-            <button type="button" onClick={addGhe} style={{ padding:'5px 12px', background:'#185FA5', color:'#fff', border:'none', borderRadius:7, fontSize:12, cursor:'pointer' }}>+ GHE</button>
-          </div>
-          {ghes.map((g, gi) => (
-            <div key={gi} style={{ border:'1px solid #e5e7eb', borderRadius:10, padding:'1rem', marginBottom:12 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto auto', gap:8, flex:1, marginRight:8 }}>
-                  <div><label style={lbl}>Nome do GHE</label>
-                    <input style={inp} value={g.nome} onChange={e => updGhe(gi,'nome',e.target.value)} />
-                  </div>
-                  <div><label style={lbl}>Setor</label>
-                    <input style={inp} placeholder="Ex: Produção" value={g.setor} onChange={e => updGhe(gi,'setor',e.target.value)} />
-                  </div>
-                  <div><label style={lbl}>Qtd trabalhadores</label>
-                    <input type="number" style={{...inp, width:80}} min="1" value={g.qtd_trabalhadores} onChange={e => updGhe(gi,'qtd_trabalhadores',parseInt(e.target.value)||1)} />
-                  </div>
-                  <div style={{ display:'flex', alignItems:'flex-end', paddingBottom:2 }}>
-                    <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:'#374151', cursor:'pointer' }}>
-                      <input type="checkbox" checked={g.aposentadoria_especial} onChange={e => updGhe(gi,'aposentadoria_especial',e.target.checked)} />
-                      Ap. especial
-                    </label>
-                  </div>
-                </div>
-                {ghes.length > 1 && <button type="button" onClick={() => remGhe(gi)} style={{ background:'#FCEBEB', border:'none', color:'#791F1F', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:12 }}>Remover</button>}
-              </div>
+      {/* Filtros */}
+      <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+        {[
+          { k:'todos',    l:`Todos (${funcionarios.length})` },
+          { k:'pendente', l:`Pendentes (${prontos.length})` },
+          { k:'ok',       l:`Transmitidos (${funcionarios.filter(f=>statusFuncionario(f).label==='Transmitido').length})` },
+          { k:'problema', l:`Problemas (${problemas.length})` },
+        ].map(f => (
+          <button key={f.k} onClick={() => setFiltro(f.k)} style={{
+            padding:'5px 12px', fontSize:12, fontWeight:500, borderRadius:99, cursor:'pointer', border:'none',
+            background: filtro===f.k?'#185FA5':'#f3f4f6', color: filtro===f.k?'#fff':'#374151',
+          }}>{f.l}</button>
+        ))}
+      </div>
 
-              <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Agentes de risco</div>
-              {g.agentes.map((ag, ai) => (
-                <div key={ai} style={{ display:'grid', gridTemplateColumns:'80px 1fr 1fr 1fr auto', gap:6, marginBottom:6 }}>
-                  <select style={{...inp, padding:'6px 6px'}} value={ag.tipo} onChange={e => { const gh=[...ghes]; gh[gi].agentes[ai].tipo=e.target.value; setGhes(gh) }}>
-                    <option value="fis">Físico</option><option value="qui">Químico</option><option value="bio">Biológico</option><option value="erg">Ergonômico</option>
-                  </select>
-                  <input style={{...inp,padding:'6px 8px'}} placeholder="Nome do agente" value={ag.nome} onChange={e => { const gh=[...ghes]; gh[gi].agentes[ai].nome=e.target.value; setGhes(gh) }} />
-                  <input style={{...inp,padding:'6px 8px'}} placeholder="Valor medido" value={ag.valor} onChange={e => { const gh=[...ghes]; gh[gi].agentes[ai].valor=e.target.value; setGhes(gh) }} />
-                  <input style={{...inp,padding:'6px 8px'}} placeholder="Limite tolerância" value={ag.limite} onChange={e => { const gh=[...ghes]; gh[gi].agentes[ai].limite=e.target.value; setGhes(gh) }} />
-                  <button type="button" onClick={() => { const gh=[...ghes]; gh[gi].agentes=gh[gi].agentes.filter((_,x)=>x!==ai); setGhes(gh) }} style={{ background:'none', border:'none', color:'#9ca3af', fontSize:16, cursor:'pointer' }}>×</button>
-                </div>
+      {/* Tabela */}
+      <div style={{ background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, overflow:'hidden' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <thead>
+            <tr style={{ background:'#f9fafb' }}>
+              {['Funcionário','Função / Setor','GHE vinculado','Agentes de risco','Última transmissão','Status','Ações'].map(h => (
+                <th key={h} style={s.th}>{h}</th>
               ))}
-              <button type="button" onClick={() => { const gh=[...ghes]; gh[gi].agentes.push({tipo:'fis',nome:'',valor:'',limite:'',supera_lt:false}); setGhes(gh) }}
-                style={{ fontSize:11, color:'#185FA5', background:'none', border:'none', cursor:'pointer', padding:0, marginBottom:10 }}>+ agente</button>
-
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>EPI</div>
-                  {g.epi.map((ep, ei) => (
-                    <div key={ei} style={{ display:'flex', gap:6, marginBottom:5 }}>
-                      <input style={{...inp,flex:1,padding:'6px 8px'}} placeholder="Nome do EPI" value={ep.nome} onChange={e => { const gh=[...ghes]; gh[gi].epi[ei].nome=e.target.value; setGhes(gh) }} />
-                      <input style={{...inp,width:90,padding:'6px 8px'}} placeholder="CA" value={ep.ca} onChange={e => { const gh=[...ghes]; gh[gi].epi[ei].ca=e.target.value; setGhes(gh) }} />
+            </tr>
+          </thead>
+          <tbody>
+            {funcsFiltradas.length === 0 ? (
+              <tr><td colSpan={7} style={{ textAlign:'center', padding:'2rem', color:'#9ca3af', fontSize:13 }}>
+                Nenhum funcionário neste filtro.
+              </td></tr>
+            ) : funcsFiltradas.map(f => {
+              const tx  = ultimaTx(f.id)
+              const st  = statusFuncionario(f)
+              const ghe = gheDoFuncionario(f)
+              return (
+                <tr key={f.id} style={{ borderBottom:'0.5px solid #f3f4f6' }}>
+                  <td style={s.td}>
+                    <div style={{ fontWeight:500 }}>{f.nome}</div>
+                    <div style={{ fontSize:11, color:'#9ca3af', fontFamily:'monospace' }}>
+                      {f.matricula_esocial?.startsWith('PEND-') ? <span style={{color:'#EF9F27'}}>Matrícula pendente</span> : f.matricula_esocial}
                     </div>
-                  ))}
-                  <button type="button" onClick={() => { const gh=[...ghes]; gh[gi].epi.push({nome:'',ca:'',eficaz:true}); setGhes(gh) }}
-                    style={{ fontSize:11, color:'#185FA5', background:'none', border:'none', cursor:'pointer', padding:0 }}>+ EPI</button>
-                </div>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>EPC</div>
-                  {g.epc.map((ep, ei) => (
-                    <div key={ei} style={{ marginBottom:5 }}>
-                      <input style={{...inp,padding:'6px 8px'}} placeholder="Nome do EPC" value={ep.nome} onChange={e => { const gh=[...ghes]; gh[gi].epc[ei].nome=e.target.value; setGhes(gh) }} />
+                  </td>
+                  <td style={s.td}>
+                    <div style={{ fontSize:13 }}>{f.funcao||'—'}</div>
+                    <div style={{ fontSize:11, color:'#6b7280' }}>{f.setor||'—'}</div>
+                  </td>
+                  <td style={s.td}>
+                    {ghe ? (
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:500 }}>{ghe.nome||'—'}</div>
+                        <div style={{ fontSize:11, color:'#6b7280' }}>{ghe.qtd_trabalhadores} trabalhador(es)</div>
+                        {ghe.aposentadoria_especial && (
+                          <span style={{ fontSize:10, color:'#791F1F', fontWeight:600 }}>⚠ Aposent. especial</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize:11, color:'#9ca3af' }}>
+                        {ltcatAtivo ? 'Setor não mapeado no LTCAT' : '—'}
+                      </span>
+                    )}
+                  </td>
+                  <td style={s.td}>
+                    {ghe?.agentes?.length ? (
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                        {ghe.agentes.slice(0,3).map((ag,i) => {
+                          const COR = { fis:'#E6F1FB', qui:'#FAEEDA', bio:'#EAF3DE', erg:'#FCEBEB' }
+                          const TXT = { fis:'#0C447C', qui:'#633806', bio:'#27500A', erg:'#791F1F' }
+                          return (
+                            <span key={i} style={{ padding:'1px 6px', borderRadius:99, fontSize:10, fontWeight:500, background:COR[ag.tipo]||'#f3f4f6', color:TXT[ag.tipo]||'#374151' }}>
+                              {ag.nome?.substring(0,18)}{ag.nome?.length>18?'...':''}
+                            </span>
+                          )
+                        })}
+                        {ghe.agentes.length > 3 && <span style={{ fontSize:10, color:'#9ca3af' }}>+{ghe.agentes.length-3}</span>}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize:11, color:'#9ca3af' }}>
+                        {ghe ? 'Sem agentes no GHE' : '—'}
+                      </span>
+                    )}
+                  </td>
+                  <td style={s.td}>
+                    {tx ? (
+                      <div>
+                        <div style={{ fontSize:11 }}>{new Date(tx.criado_em).toLocaleDateString('pt-BR')}</div>
+                        <div style={{ fontSize:10, color:'#9ca3af', fontFamily:'monospace' }}>
+                          {tx.recibo ? tx.recibo.substring(0,12)+'...' : '—'}
+                        </div>
+                        {tx.erro_descricao && (
+                          <div style={{ fontSize:10, color:'#E24B4A', marginTop:2 }} title={tx.erro_descricao}>
+                            {tx.erro_descricao.substring(0,30)}...
+                          </div>
+                        )}
+                      </div>
+                    ) : <span style={{ color:'#9ca3af', fontSize:12 }}>—</span>}
+                  </td>
+                  <td style={s.td}>
+                    <div>
+                      <span style={{ padding:'3px 10px', borderRadius:99, fontSize:11, fontWeight:600, background:st.bg, color:st.cor }}>
+                        {st.label}
+                      </span>
+                      {st.motivo && <div style={{ fontSize:10, color:'#9ca3af', marginTop:3, maxWidth:160 }}>{st.motivo}</div>}
                     </div>
-                  ))}
-                  <button type="button" onClick={() => { const gh=[...ghes]; gh[gi].epc.push({nome:'',eficaz:true}); setGhes(gh) }}
-                    style={{ fontSize:11, color:'#185FA5', background:'none', border:'none', cursor:'pointer', padding:0 }}>+ EPC</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display:'flex', gap:10 }}>
-          <button type="submit" disabled={salvando} style={{ padding:'10px 20px', background:'#EF9F27', color:'#412402', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', opacity:salvando?0.7:1 }}>
-            {salvando ? 'Salvando...' : 'Salvar LTCAT'}
-          </button>
-          <button type="button" onClick={() => router.push('/historico')} style={{ padding:'10px 20px', background:'transparent', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, color:'#374151', cursor:'pointer' }}>
-            Ver histórico
-          </button>
-        </div>
-      </form>
+                  </td>
+                  <td style={s.td}>
+                    <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                      {st.label === 'Não transmitido' && ltcatAtivo && (
+                        <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
+                          onClick={() => criarTransmissao(f.id)}>
+                          Criar S-2240
+                        </button>
+                      )}
+                      {st.pode && tx && (
+                        <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
+                          onClick={() => router.push('/transmissao-manual')}>
+                          Transmitir
+                        </button>
+                      )}
+                      {st.label === 'Dados incompletos' && (
+                        <button style={{ ...s.btnAcao, color:'#EF9F27', borderColor:'#FAC775' }}
+                          onClick={() => router.push('/funcionarios')}>
+                          Completar dados
+                        </button>
+                      )}
+                      {!ghe && ltcatAtivo && (
+                        <button style={{ ...s.btnAcao, color:'#633806', borderColor:'#FAC775' }}
+                          onClick={() => router.push('/ltcat')}>
+                          Mapear GHE
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </Layout>
   )
+}
+
+const s = {
+  loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
+  header:     { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1.25rem' },
+  titulo:     { fontSize:18, fontWeight:700, color:'#111' },
+  sub:        { fontSize:12, color:'#6b7280', marginTop:2 },
+  th:         { padding:'10px 12px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', borderBottom:'0.5px solid #e5e7eb', textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' },
+  td:         { padding:'10px 12px', verticalAlign:'top', color:'#374151' },
+  btnAcao:    { padding:'3px 10px', fontSize:11, background:'transparent', border:'0.5px solid #d1d5db', borderRadius:6, cursor:'pointer', color:'#374151', whiteSpace:'nowrap' },
+  btnPrimary: { padding:'8px 16px', background:'#185FA5', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' },
+  btnOutline: { padding:'8px 14px', background:'transparent', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', color:'#374151' },
+  erroBox:    { background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12 },
+  sucessoBox: { background:'#EAF3DE', color:'#27500A', border:'0.5px solid #C0DD97', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12 },
 }
