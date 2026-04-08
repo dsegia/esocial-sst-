@@ -21,6 +21,10 @@ export default function S2240() {
   const [erro, setErro] = useState('')
   // Mapear GHE
   const [mapeandoFunc, setMapeandoFunc] = useState(null)
+  // Editar funcionário
+  const [editandoFunc, setEditandoFunc] = useState(null)
+  const [formEdit, setFormEdit] = useState({})
+  const [salvandoEdit, setSalvandoEdit] = useState(false)
   const [gheSelecionado, setGheSelecionado] = useState('')
 
   useEffect(() => { init() }, [])
@@ -56,12 +60,17 @@ export default function S2240() {
       return ltcatAtivo.ghes[func.ghe_id] || null
     }
 
-    // 2. Função do funcionário bate com funcoes cadastradas no GHE
+    // 2. Cargo/Função do funcionário bate com funcoes cadastradas no GHE
     if (func.funcao) {
-      const fnLow = func.funcao.toLowerCase()
+      const fnLow = func.funcao.toLowerCase().trim()
       for (const ghe of ltcatAtivo.ghes) {
-        const fnsGhe = (ghe.funcoes || []).map(f => f.toLowerCase())
-        if (fnsGhe.some(f => f.includes(fnLow) || fnLow.includes(f))) return ghe
+        const fnsGhe = (ghe.funcoes || []).map(f => f.toLowerCase().trim())
+        // Verifica correspondência parcial em ambas as direções
+        if (fnsGhe.some(f =>
+          f.includes(fnLow) || fnLow.includes(f) ||
+          // Verifica palavras principais (ignora preposições)
+          fnLow.split(' ').filter(w=>w.length>3).some(w => f.includes(w))
+        )) return ghe
       }
     }
 
@@ -122,6 +131,22 @@ export default function S2240() {
     if (error) { setErro('Erro: ' + error.message); return }
     setSucesso('Transmissão S-2240 criada.')
     init()
+  }
+
+  async function salvarEdicaoFunc() {
+    setSalvandoEdit(true)
+    const { error } = await supabase.from('funcionarios').update({
+      nome:              formEdit.nome,
+      cpf:               formEdit.cpf,
+      data_nasc:         formEdit.data_nasc || null,
+      data_adm:          formEdit.data_adm  || null,
+      matricula_esocial: formEdit.matricula_esocial || ('PEND-' + Date.now()),
+      funcao:            formEdit.funcao || null,
+      setor:             formEdit.setor  || null,
+    }).eq('id', editandoFunc.id)
+    if (error) { setErro('Erro: ' + error.message) }
+    else { setSucesso('Funcionário atualizado!'); setEditandoFunc(null); init() }
+    setSalvandoEdit(false)
   }
 
   async function criarParaTodos() {
@@ -273,7 +298,7 @@ export default function S2240() {
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
           <thead>
             <tr style={{ background:'#f9fafb' }}>
-              {['Funcionário','Função / Setor','GHE vinculado','Agentes de risco','Última transmissão','Status','Ações'].map(h => (
+              {['Funcionário','Função / Cargo · Setor','GHE vinculado','Agentes de risco','Última transmissão','Status','Ações'].map(h => (
                 <th key={h} style={s.th}>{h}</th>
               ))}
             </tr>
@@ -358,18 +383,16 @@ export default function S2240() {
                           Transmitir
                         </button>
                       )}
-                      {st.label === 'Dados incompletos' && (
-                        <button style={{ ...s.btnAcao, color:'#EF9F27', borderColor:'#FAC775' }}
-                          onClick={() => router.push('/funcionarios')}>
-                          Completar
-                        </button>
-                      )}
                       {ghe && (
                         <button style={{ ...s.btnAcao, color:'#6b7280' }}
                           onClick={() => { setMapeandoFunc(f); setGheSelecionado(String(ltcatAtivo.ghes.indexOf(ghe))) }}>
                           Trocar GHE
                         </button>
                       )}
+                      <button style={{ ...s.btnAcao, color:'#374151' }}
+                        onClick={() => setEditandoFunc(f)}>
+                        ✏ Editar
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -378,6 +401,49 @@ export default function S2240() {
           </tbody>
         </table>
       </div>
+      {/* Modal edição rápida */}
+      {editandoFunc && (
+        <div style={s.overlay} onClick={() => setEditandoFunc(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>✏ Editar — {editandoFunc.nome}</div>
+              <button onClick={() => setEditandoFunc(null)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
+            </div>
+            {!Object.keys(formEdit).length && (() => {
+              setFormEdit({
+                nome: editandoFunc.nome||'', cpf: editandoFunc.cpf||'',
+                data_nasc: editandoFunc.data_nasc||'', data_adm: editandoFunc.data_adm||'',
+                matricula_esocial: editandoFunc.matricula_esocial?.startsWith('PEND-')?'':editandoFunc.matricula_esocial||'',
+                funcao: editandoFunc.funcao||'', setor: editandoFunc.setor||'',
+              })
+              return null
+            })()}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+              {[
+                ['Nome completo','nome','text'],
+                ['CPF','cpf','text'],
+                ['Nascimento','data_nasc','date'],
+                ['Admissão','data_adm','date'],
+                ['Matrícula eSocial','matricula_esocial','text'],
+                ['Função / Cargo','funcao','text'],
+                ['Setor / GHE','setor','text'],
+              ].map(([label, field, type]) => (
+                <div key={field}>
+                  <label style={{ display:'block', fontSize:11, fontWeight:500, color:'#374151', marginBottom:3 }}>{label}</label>
+                  <input style={s.inputModal} type={type} value={formEdit[field]||''}
+                    onChange={e => setFormEdit(p => ({...p, [field]: e.target.value}))}/>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button style={s.btnPrimary} onClick={salvarEdicaoFunc} disabled={salvandoEdit}>
+                {salvandoEdit ? 'Salvando...' : 'Salvar alterações'}
+              </button>
+              <button style={s.btnOutline} onClick={() => setEditandoFunc(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

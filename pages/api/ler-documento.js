@@ -105,9 +105,21 @@ REGRAS IMPORTANTES:
 }`
 
   const prompt_ltcat = `Você é um extrator de dados de LTCAT brasileiro. Retorne SOMENTE o JSON abaixo. Campos não encontrados devem ser null.
+
+REGRAS IMPORTANTES:
+- Em "funcoes": extraia TODOS os cargos e funções listados nos campos "FUNÇÕES DO GRUPO", "CARGOS", "FUNÇÕES", "CARGOS DO GRUPO" ou similar de cada GHE. Podem ser chamados de cargo ou função — extraia todos como itens separados do array.
+- Em "agentes": extraia cada agente de risco individualmente com tipo (fis=físico, qui=químico, bio=biológico, erg=ergonômico)
+- "qtd_trabalhadores": número de trabalhadores do grupo se informado
+- "aposentadoria_especial": true se o grupo tiver direito à aposentadoria especial
+
 {
   "dados_gerais":{"data_emissao":null,"data_vigencia":null,"prox_revisao":null,"resp_nome":null,"resp_conselho":"CREA","resp_registro":null},
-  "ghes":[{"nome":"GHE 01","setor":null,"qtd_trabalhadores":1,"aposentadoria_especial":false,
+  "ghes":[{
+    "nome":"GHE 01",
+    "setor":null,
+    "qtd_trabalhadores":1,
+    "aposentadoria_especial":false,
+    "funcoes":["Cargo ou Função 1","Cargo ou Função 2"],
     "agentes":[{"tipo":"fis","nome":"nome do agente","valor":null,"limite":null,"supera_lt":false}],
     "epc":[{"nome":"EPC","eficaz":true}],
     "epi":[{"nome":"EPI","ca":null,"eficaz":true}]

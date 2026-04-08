@@ -17,6 +17,9 @@ export default function S2220() {
   const [transmissoes, setTransmissoes] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState('todos')
+  const [editandoFunc, setEditandoFunc] = useState(null)
+  const [formEdit, setFormEdit] = useState({})
+  const [salvandoEdit, setSalvandoEdit] = useState(false)
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
 
@@ -85,6 +88,22 @@ export default function S2220() {
     if (vencido) return { label:'ASO vencido', cor:'#E24B4A', bg:'#FCEBEB', pode:true, motivo:`Vencido há ${Math.abs(dias)} dias` }
 
     return { label:'Em dia', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:'' }
+  }
+
+  async function salvarEdicaoFunc() {
+    setSalvandoEdit(true)
+    const { error } = await supabase.from('funcionarios').update({
+      nome:              formEdit.nome,
+      cpf:               formEdit.cpf,
+      data_nasc:         formEdit.data_nasc || null,
+      data_adm:          formEdit.data_adm  || null,
+      matricula_esocial: formEdit.matricula_esocial || ('PEND-' + Date.now()),
+      funcao:            formEdit.funcao || null,
+      setor:             formEdit.setor  || null,
+    }).eq('id', editandoFunc.id)
+    if (error) { setErro('Erro: ' + error.message) }
+    else { setSucesso('Funcionário atualizado!'); setEditandoFunc(null); init() }
+    setSalvandoEdit(false)
   }
 
   const funcsFiltradas = funcionarios.filter(f => {
@@ -269,25 +288,19 @@ export default function S2220() {
                   {/* Ações */}
                   <td style={s.td}>
                     <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                      {/* Ir para transmissão */}
                       {st.pode && (
                         <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
                           onClick={() => router.push('/transmissao-manual')}>
                           Transmitir
                         </button>
                       )}
-                      {/* Importar novo ASO */}
-                      <button style={s.btnAcao}
-                        onClick={() => router.push('/leitor')}>
+                      <button style={s.btnAcao} onClick={() => router.push('/leitor')}>
                         {aso ? 'Novo ASO' : 'Importar ASO'}
                       </button>
-                      {/* Completar dados */}
-                      {st.label === 'Dados incompletos' && (
-                        <button style={{ ...s.btnAcao, color:'#EF9F27', borderColor:'#FAC775' }}
-                          onClick={() => router.push('/funcionarios')}>
-                          Completar
-                        </button>
-                      )}
+                      <button style={{ ...s.btnAcao, color:'#374151' }}
+                        onClick={() => setEditandoFunc(f)}>
+                        ✏ Editar
+                      </button>
                     </div>
                   </td>
 
@@ -297,6 +310,49 @@ export default function S2220() {
           </tbody>
         </table>
       </div>
+      {/* Modal edição rápida de funcionário */}
+      {editandoFunc && (
+        <div style={s.overlay} onClick={() => setEditandoFunc(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>✏ Editar — {editandoFunc.nome}</div>
+              <button onClick={() => setEditandoFunc(null)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
+            </div>
+            {!Object.keys(formEdit).length && (() => {
+              setFormEdit({
+                nome: editandoFunc.nome||'', cpf: editandoFunc.cpf||'',
+                data_nasc: editandoFunc.data_nasc||'', data_adm: editandoFunc.data_adm||'',
+                matricula_esocial: editandoFunc.matricula_esocial?.startsWith('PEND-')?'':editandoFunc.matricula_esocial||'',
+                funcao: editandoFunc.funcao||'', setor: editandoFunc.setor||'',
+              })
+              return null
+            })()}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+              {[
+                ['Nome completo','nome','text'],
+                ['CPF','cpf','text'],
+                ['Nascimento','data_nasc','date'],
+                ['Admissão','data_adm','date'],
+                ['Matrícula eSocial','matricula_esocial','text'],
+                ['Função / Cargo','funcao','text'],
+                ['Setor / GHE','setor','text'],
+              ].map(([label, field, type]) => (
+                <div key={field}>
+                  <label style={{ display:'block', fontSize:11, fontWeight:500, color:'#374151', marginBottom:3 }}>{label}</label>
+                  <input style={s.inputModal} type={type} value={formEdit[field]||''}
+                    onChange={e => setFormEdit(p => ({...p, [field]: e.target.value}))}/>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:8, marginTop:4 }}>
+              <button style={s.btnPrimary} onClick={salvarEdicaoFunc} disabled={salvandoEdit}>
+                {salvandoEdit ? 'Salvando...' : 'Salvar alterações'}
+              </button>
+              <button style={s.btnOutline} onClick={() => setEditandoFunc(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }
@@ -313,4 +369,7 @@ const s = {
   btnOutline: { padding:'8px 14px', background:'transparent', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', color:'#374151' },
   erroBox:    { background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12 },
   sucessoBox: { background:'#EAF3DE', color:'#27500A', border:'0.5px solid #C0DD97', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12 },
-}
+
+  overlay:    { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 },
+  modal:      { background:'#fff', borderRadius:12, padding:'1.5rem', width:520, maxHeight:'90vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.2)' },
+  inputModal: { width:'100%', padding:'7px 9px', fontSize:12, border:'1px solid #d1d5db', borderRadius:7, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' },}

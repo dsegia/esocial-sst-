@@ -525,7 +525,7 @@ export default function LTCAT() {
                         </div>
                         <div style={{ display:'flex', gap:8 }}>
                           <input id="inp-funcao-ghe" style={{ ...s.input, flex:1 }}
-                            placeholder="Ex: Operador de Produção, Soldador, Auxiliar..."
+                            placeholder="Ex: Operador de Produção, Soldador, Cargo/Função..."
                             list="funcoes-existentes"
                             onKeyDown={e => {
                               if (e.key === 'Enter' && e.target.value.trim()) {

@@ -173,7 +173,7 @@ export default function Funcionarios() {
             </div>
             <div style={s.row2}>
               <div style={s.field}>
-                <label style={s.label}>Função / CBO</label>
+                <label style={s.label}>Função / Cargo</label>
                 <input style={s.input} value={form.funcao} onChange={e => setForm({...form, funcao:e.target.value})} />
               </div>
               <div style={s.field}>
