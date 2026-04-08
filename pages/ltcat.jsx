@@ -17,7 +17,7 @@ const TXT_AGENTE  = { fis:'#0C447C', qui:'#633806', bio:'#27500A', erg:'#791F1F'
 
 const gheVazio = () => ({
   nome: '', setor: '', qtd_trabalhadores: 1, aposentadoria_especial: false,
-  agentes: [], epc: [], epi: []
+  agentes: [], epc: [], epi: [], funcoes: []
 })
 const agenteVazio = () => ({ tipo:'fis', nome:'', valor:'', limite:'', supera_lt:false })
 const epiVazio    = () => ({ nome:'', ca:'', eficaz:true })
@@ -350,27 +350,47 @@ export default function LTCAT() {
                           </div>
                         )}
                         {/* Funções/cargos deste GHE */}
+                        {/* Funções cadastradas no GHE */}
                         {(() => {
-                          const funcsGHE = todosFunc.filter(f => {
+                          const fnsCadastradas = ghe.funcoes || []
+                          const fncsVinculadas = todosFunc.filter(f => {
+                            if (f.ghe_id === ltcatSel.ghes.indexOf(ghe)) return true
                             const sg = (ghe.setor||'').toLowerCase()
                             const sf = (f.setor||'').toLowerCase()
-                            if (f.ghe_id === ltcatSel.ghes.indexOf(ghe)) return true
                             return sg && sf && (sg.includes(sf) || sf.includes(sg))
                           })
-                          if (!funcsGHE.length) return null
+                          const todasFuncoes = [...new Set([
+                            ...fnsCadastradas,
+                            ...fncsVinculadas.map(f=>f.funcao).filter(Boolean)
+                          ])]
+                          if (!todasFuncoes.length && !fncsVinculadas.length) return (
+                            <div style={{ marginBottom:12, padding:'8px 12px', background:'#FAEEDA', borderRadius:8, fontSize:12, color:'#633806' }}>
+                              ⚠ Nenhuma função associada a este GHE. Clique em "Editar LTCAT" para adicionar.
+                            </div>
+                          )
                           return (
                             <div style={{ marginBottom:12 }}>
-                              <div style={s.secLabel}>Funções/cargos neste GHE ({funcsGHE.length})</div>
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                                {[...new Set(funcsGHE.map(f=>f.funcao).filter(Boolean))].map((fn,i) => (
-                                  <span key={i} style={{ padding:'2px 8px', borderRadius:99, fontSize:11, background:'#E6F1FB', color:'#0C447C' }}>{fn}</span>
-                                ))}
-                                {funcsGHE.filter(f=>!f.funcao).length > 0 && (
-                                  <span style={{ padding:'2px 8px', borderRadius:99, fontSize:11, background:'#f3f4f6', color:'#6b7280' }}>
-                                    {funcsGHE.filter(f=>!f.funcao).length} sem função definida
-                                  </span>
-                                )}
+                              <div style={s.secLabel}>
+                                Funções/cargos neste GHE
+                                ({fncsVinculadas.length} funcionário(s) vinculado(s))
                               </div>
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
+                                {todasFuncoes.map((fn,i) => {
+                                  const qtd = fncsVinculadas.filter(f=>f.funcao===fn).length
+                                  return (
+                                    <span key={i} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:99, fontSize:11, background:'#E6F1FB', color:'#0C447C' }}>
+                                      {fn}
+                                      {qtd > 0 && <span style={{ background:'#185FA5', color:'#fff', borderRadius:99, padding:'0 5px', fontSize:10 }}>{qtd}</span>}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                              {fncsVinculadas.length > 0 && (
+                                <div style={{ fontSize:11, color:'#6b7280' }}>
+                                  Funcionários: {fncsVinculadas.slice(0,3).map(f=>f.nome.split(' ')[0]).join(', ')}
+                                  {fncsVinculadas.length > 3 && ` +${fncsVinculadas.length-3} mais`}
+                                </div>
+                              )}
                             </div>
                           )
                         })()}
@@ -484,6 +504,58 @@ export default function LTCAT() {
                           <select style={s.input} value={ghe.aposentadoria_especial?'sim':'nao'} onChange={e=>setGhe('aposentadoria_especial',e.target.value==='sim')}>
                             <option value="nao">Não</option><option value="sim">Sim</option>
                           </select>
+                        </div>
+                      </div>
+
+                      {/* Funções/Cargos do GHE */}
+                      <div style={{ marginBottom:12 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                          <label style={s.label}>Funções/Cargos neste GHE</label>
+                          <span style={{ fontSize:11, color:'#9ca3af' }}>Usado para vincular funcionários automaticamente</span>
+                        </div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:6 }}>
+                          {(ghe.funcoes||[]).map((fn,fi) => (
+                            <span key={fi} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:99, fontSize:12, background:'#E6F1FB', color:'#0C447C' }}>
+                              {fn}
+                              <button onClick={()=>{
+                                setFormLtcat(p=>{const g=JSON.parse(JSON.stringify(p.ghes));g[gheAtivo].funcoes=g[gheAtivo].funcoes.filter((_,i)=>i!==fi);return{...p,ghes:g}})
+                              }} style={{background:'none',border:'none',cursor:'pointer',color:'#0C447C',fontSize:14,lineHeight:1,padding:0}}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <input id="inp-funcao-ghe" style={{ ...s.input, flex:1 }}
+                            placeholder="Ex: Operador de Produção, Soldador, Auxiliar..."
+                            list="funcoes-existentes"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                const fn = e.target.value.trim()
+                                setFormLtcat(p => {
+                                  const g = JSON.parse(JSON.stringify(p.ghes))
+                                  g[gheAtivo].funcoes = [...(g[gheAtivo].funcoes||[]), fn]
+                                  return { ...p, ghes: g }
+                                })
+                                e.target.value = ''
+                              }
+                            }}/>
+                          <datalist id="funcoes-existentes">
+                            {todosFunc.map(f=>f.funcao).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).map(fn=>(
+                              <option key={fn} value={fn}/>
+                            ))}
+                          </datalist>
+                          <button style={{ ...s.btnOutline, padding:'6px 12px', fontSize:12, whiteSpace:'nowrap' }}
+                            onClick={() => {
+                              const inp = document.getElementById('inp-funcao-ghe')
+                              if (inp?.value.trim()) {
+                                const fn = inp.value.trim()
+                                setFormLtcat(p => {
+                                  const g = JSON.parse(JSON.stringify(p.ghes))
+                                  g[gheAtivo].funcoes = [...(g[gheAtivo].funcoes||[]), fn]
+                                  return { ...p, ghes: g }
+                                })
+                                inp.value = ''
+                              }
+                            }}>+ Adicionar</button>
                         </div>
                       </div>
 

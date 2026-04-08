@@ -50,19 +50,41 @@ export default function S2240() {
 
   function gheDoFuncionario(func) {
     if (!ltcatAtivo?.ghes) return null
+
     // 1. GHE fixado manualmente (ghe_id salvo no funcionário)
     if (func.ghe_id !== undefined && func.ghe_id !== null) {
       return ltcatAtivo.ghes[func.ghe_id] || null
     }
-    // 2. Cruzamento por setor
-    for (const ghe of ltcatAtivo.ghes) {
-      const sg = (ghe.setor||'').toLowerCase()
-      const sf = (func.setor||'').toLowerCase()
-      if (sg && sf && (sg.includes(sf) || sf.includes(sg))) return ghe
+
+    // 2. Função do funcionário bate com funcoes cadastradas no GHE
+    if (func.funcao) {
+      const fnLow = func.funcao.toLowerCase()
+      for (const ghe of ltcatAtivo.ghes) {
+        const fnsGhe = (ghe.funcoes || []).map(f => f.toLowerCase())
+        if (fnsGhe.some(f => f.includes(fnLow) || fnLow.includes(f))) return ghe
+      }
     }
-    // 3. Se só tem 1 GHE
+
+    // 3. Cruzamento por setor
+    if (func.setor) {
+      for (const ghe of ltcatAtivo.ghes) {
+        const sg = (ghe.setor||'').toLowerCase()
+        const sf = func.setor.toLowerCase()
+        if (sg && sf && (sg.includes(sf) || sf.includes(sg))) return ghe
+      }
+    }
+
+    // 4. Se só tem 1 GHE, assume que é dele
     if (ltcatAtivo.ghes.length === 1) return ltcatAtivo.ghes[0]
+
     return null
+  }
+
+  // Índice do GHE para o funcionário (para salvar no banco)
+  function idxGheDoFuncionario(func) {
+    const ghe = gheDoFuncionario(func)
+    if (!ghe || !ltcatAtivo?.ghes) return null
+    return ltcatAtivo.ghes.indexOf(ghe)
   }
 
   function statusFuncionario(func) {
@@ -206,19 +228,35 @@ export default function S2240() {
                 <option key={i} value={i}>
                   {g.nome||`GHE ${i+1}`}
                   {g.setor ? ` — ${g.setor}` : ''}
+                  {g.funcoes?.length ? ` · Funções: ${g.funcoes.slice(0,2).join(', ')}${g.funcoes.length>2?'...':''}` : ''}
                   {` (${g.agentes?.length||0} agentes)`}
                 </option>
               ))}
             </select>
             {gheSelecionado !== '' && ltcatAtivo?.ghes[parseInt(gheSelecionado)] && (
               <div style={{ background:'#f9fafb', borderRadius:8, padding:'10px 12px', marginBottom:12, fontSize:12, color:'#374151' }}>
-                <div style={{ fontWeight:500, marginBottom:4 }}>{ltcatAtivo.ghes[parseInt(gheSelecionado)].nome}</div>
-                <div style={{ color:'#6b7280' }}>
-                  Agentes: {(ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes||[]).slice(0,3).map(a=>a.nome).join(', ')}
+                <div style={{ fontWeight:600, marginBottom:6, color:'#111' }}>
+                  {ltcatAtivo.ghes[parseInt(gheSelecionado)].nome}
+                  {ltcatAtivo.ghes[parseInt(gheSelecionado)].setor && (
+                    <span style={{ fontWeight:400, color:'#6b7280' }}> · {ltcatAtivo.ghes[parseInt(gheSelecionado)].setor}</span>
+                  )}
+                </div>
+                {(ltcatAtivo.ghes[parseInt(gheSelecionado)].funcoes||[]).length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase', marginBottom:3 }}>Funções cadastradas</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {ltcatAtivo.ghes[parseInt(gheSelecionado)].funcoes.map((fn,i) => (
+                        <span key={i} style={{ padding:'1px 7px', borderRadius:99, fontSize:11, background:'#E6F1FB', color:'#0C447C' }}>{fn}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={{ color:'#6b7280', marginBottom:4 }}>
+                  <strong>Agentes:</strong> {(ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes||[]).slice(0,3).map(a=>a.nome).join(', ')}
                   {(ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes||[]).length > 3 && ` +${ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes.length-3}`}
                 </div>
                 {ltcatAtivo.ghes[parseInt(gheSelecionado)].aposentadoria_especial && (
-                  <div style={{ color:'#791F1F', marginTop:4, fontWeight:500 }}>⚠ Aposentadoria especial</div>
+                  <div style={{ color:'#791F1F', fontWeight:500 }}>⚠ Aposentadoria especial — direito à aposentadoria reduzida</div>
                 )}
               </div>
             )}
