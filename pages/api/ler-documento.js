@@ -104,13 +104,16 @@ REGRAS IMPORTANTES:
   "confianca":{"nome":85,"cpf":85,"tipo_aso":80,"data_exame":90,"conclusao":85}
 }`
 
-  const prompt_ltcat = `Você é um extrator de dados de LTCAT brasileiro. Retorne SOMENTE o JSON abaixo. Campos não encontrados devem ser null.
+  const prompt_ltcat = `Você é um extrator especializado em LTCAT (Laudo Técnico das Condições Ambientais do Trabalho) brasileiro.
+Analise o documento completo e retorne SOMENTE o JSON abaixo. Nenhum texto antes ou depois. Campos não encontrados: null.
 
-REGRAS IMPORTANTES:
-- Em "funcoes": extraia TODOS os cargos e funções listados nos campos "FUNÇÕES DO GRUPO", "CARGOS", "FUNÇÕES", "CARGOS DO GRUPO" ou similar de cada GHE. Podem ser chamados de cargo ou função — extraia todos como itens separados do array.
-- Em "agentes": extraia cada agente de risco individualmente com tipo (fis=físico, qui=químico, bio=biológico, erg=ergonômico)
-- "qtd_trabalhadores": número de trabalhadores do grupo se informado
-- "aposentadoria_especial": true se o grupo tiver direito à aposentadoria especial
+REGRAS CRÍTICAS:
+1. "funcoes" de cada GHE: extraia CADA cargo/função listado no campo "FUNÇÕES DO GRUPO", "CARGOS DO GRUPO", "CARGOS", "FUNÇÕES" ou equivalente. São listas longas separadas por vírgula ou ponto — extraia CADA UM como item separado. Exemplo real: "Apontador, Analista de controle, Engenheiro mecânico" → ["Apontador","Analista de controle","Engenheiro mecânico"]. NÃO agrupe, NÃO resuma.
+2. "nome" do GHE: use o identificador como "GHE 01", "GHE 02", "GRUPO 01" etc.
+3. "setor": campo "SETOR" ou "ÁREA" do GHE quando disponível.
+4. "agentes": CADA agente de risco separado. tipo: fis=físico, qui=químico, bio=biológico, erg=ergonômico.
+5. "aposentadoria_especial": true se houver indicação de aposentadoria especial, adicional ou atividade especial.
+6. "epi" e "epc": liste cada equipamento individualmente com CA quando disponível.
 
 {
   "dados_gerais":{"data_emissao":null,"data_vigencia":null,"prox_revisao":null,"resp_nome":null,"resp_conselho":"CREA","resp_registro":null},
@@ -119,12 +122,12 @@ REGRAS IMPORTANTES:
     "setor":null,
     "qtd_trabalhadores":1,
     "aposentadoria_especial":false,
-    "funcoes":["Cargo ou Função 1","Cargo ou Função 2"],
-    "agentes":[{"tipo":"fis","nome":"nome do agente","valor":null,"limite":null,"supera_lt":false}],
-    "epc":[{"nome":"EPC","eficaz":true}],
-    "epi":[{"nome":"EPI","ca":null,"eficaz":true}]
+    "funcoes":["Cargo 1","Cargo 2","Função 3"],
+    "agentes":[{"tipo":"fis","nome":"Ruído contínuo","valor":null,"limite":null,"supera_lt":false}],
+    "epc":[{"nome":"nome do EPC","eficaz":true}],
+    "epi":[{"nome":"nome do EPI","ca":"12345","eficaz":true}]
   }],
-  "confianca":{"data_emissao":90,"resp_nome":90,"ghes":75}
+  "confianca":{"data_emissao":90,"resp_nome":90,"ghes":85}
 }`
 
   const promptBase = tipo === 'ltcat' ? prompt_ltcat : prompt_aso

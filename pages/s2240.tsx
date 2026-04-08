@@ -23,6 +23,7 @@ export default function S2240() {
   const [mapeandoFunc, setMapeandoFunc] = useState(null)
   // Editar funcionário
   const [editandoFunc, setEditandoFunc] = useState(null)
+  const [confirmExcluirTx, setConfirmExcluirTx] = useState(null)
   const [formEdit, setFormEdit] = useState({})
   const [salvandoEdit, setSalvandoEdit] = useState(false)
   const [gheSelecionado, setGheSelecionado] = useState('')
@@ -147,6 +148,14 @@ export default function S2240() {
     if (error) { setErro('Erro: ' + error.message) }
     else { setSucesso('Funcionário atualizado!'); setEditandoFunc(null); init() }
     setSalvandoEdit(false)
+  }
+
+  async function excluirTransmissao(txId) {
+    const { error } = await supabase.from('transmissoes').delete().eq('id', txId)
+    if (error) { setErro('Erro ao excluir: ' + error.message); return }
+    setSucesso('Transmissão excluída.')
+    setConfirmExcluirTx(null)
+    init()
   }
 
   async function criarParaTodos() {
@@ -364,7 +373,8 @@ export default function S2240() {
                     {st.motivo && <div style={{ fontSize:10, color:'#9ca3af', marginTop:3, maxWidth:160 }}>{st.motivo}</div>}
                   </td>
                   <td style={s.td}>
-                    <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      {/* Vincular / Criar / Transmitir */}
                       {!ghe && ltcatAtivo && (
                         <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
                           onClick={() => { setMapeandoFunc(f); setGheSelecionado('') }}>
@@ -374,25 +384,41 @@ export default function S2240() {
                       {ghe && st.label === 'Não transmitido' && (
                         <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
                           onClick={() => criarTransmissao(f.id)}>
-                          Criar S-2240
+                          📋 Criar S-2240
                         </button>
                       )}
                       {st.pode && tx && (
                         <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
                           onClick={() => router.push('/transmissao-manual')}>
-                          Transmitir
+                          📡 Transmitir
                         </button>
                       )}
                       {ghe && (
-                        <button style={{ ...s.btnAcao, color:'#6b7280' }}
+                        <button style={{ ...s.btnAcao, color:'#6b7280', fontSize:10 }}
                           onClick={() => { setMapeandoFunc(f); setGheSelecionado(String(ltcatAtivo.ghes.indexOf(ghe))) }}>
                           Trocar GHE
                         </button>
                       )}
+                      {/* Editar funcionário */}
                       <button style={{ ...s.btnAcao, color:'#374151' }}
-                        onClick={() => setEditandoFunc(f)}>
-                        ✏ Editar
+                        onClick={() => {
+                          setFormEdit({
+                            nome: f.nome||'', cpf: f.cpf||'',
+                            data_nasc: f.data_nasc||'', data_adm: f.data_adm||'',
+                            matricula_esocial: f.matricula_esocial?.startsWith('PEND-')?'':f.matricula_esocial||'',
+                            funcao: f.funcao||'', setor: f.setor||'',
+                          })
+                          setEditandoFunc(f)
+                        }}>
+                        ✏ Editar funcionário
                       </button>
+                      {/* Excluir transmissão */}
+                      {tx && (
+                        <button style={{ ...s.btnAcao, color:'#E24B4A', borderColor:'#F09595', fontSize:11 }}
+                          onClick={() => setConfirmExcluirTx(tx)}>
+                          🗑 Excluir transmissão
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -401,6 +427,30 @@ export default function S2240() {
           </tbody>
         </table>
       </div>
+      {/* Modal confirmar exclusão de transmissão */}
+      {confirmExcluirTx && (
+        <div style={s.overlay} onClick={() => setConfirmExcluirTx(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:14, fontWeight:600, color:'#111', marginBottom:8 }}>🗑 Excluir transmissão S-2240</div>
+            <div style={{ fontSize:13, color:'#374151', marginBottom:14, lineHeight:1.6 }}>
+              Confirma a exclusão da transmissão S-2240 deste funcionário?
+              {confirmExcluirTx.status === 'enviado' && (
+                <div style={{ marginTop:8, background:'#FCEBEB', padding:'8px 12px', borderRadius:8, color:'#E24B4A', fontSize:12 }}>
+                  ⚠ Esta transmissão já foi enviada ao Gov.br. A exclusão é apenas local.
+                </div>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button style={{ ...s.btnOutline, color:'#E24B4A', borderColor:'#F09595' }}
+                onClick={() => excluirTransmissao(confirmExcluirTx.id)}>
+                Confirmar exclusão
+              </button>
+              <button style={s.btnOutline} onClick={() => setConfirmExcluirTx(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal edição rápida */}
       {editandoFunc && (
         <div style={s.overlay} onClick={() => setEditandoFunc(null)}>
@@ -409,15 +459,7 @@ export default function S2240() {
               <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>✏ Editar — {editandoFunc.nome}</div>
               <button onClick={() => setEditandoFunc(null)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
             </div>
-            {!Object.keys(formEdit).length && (() => {
-              setFormEdit({
-                nome: editandoFunc.nome||'', cpf: editandoFunc.cpf||'',
-                data_nasc: editandoFunc.data_nasc||'', data_adm: editandoFunc.data_adm||'',
-                matricula_esocial: editandoFunc.matricula_esocial?.startsWith('PEND-')?'':editandoFunc.matricula_esocial||'',
-                funcao: editandoFunc.funcao||'', setor: editandoFunc.setor||'',
-              })
-              return null
-            })()}
+
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
               {[
                 ['Nome completo','nome','text'],
