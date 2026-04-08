@@ -89,11 +89,18 @@ export default async function handler(req, res) {
   if (!geminiKey && !anthropicKey) return res.status(500).json({ erro: 'Nenhuma API key configurada' })
 
   const prompt_aso = `Você é um extrator de dados de ASO brasileiro. Analise o documento e retorne SOMENTE o JSON abaixo preenchido. Não escreva nada antes ou depois do JSON. Campos não encontrados devem ser null.
+
+REGRAS IMPORTANTES:
+- Em "exames": liste CADA exame separadamente com seu resultado individual
+- Em "riscos": liste CADA agente de risco INDIVIDUALMENTE — não agrupe vários numa só string. Exemplos corretos: ["Ruído contínuo ou intermitente","Poeira respirável sílica","Queda de nível diferente","Vapores alcalinos"]. Exemplos ERRADOS: ["Ruído, poeira, queda"] ou ["FÍSICO"] ou ["QUÍMICO"] ou ["ERGONÔMICO"]
+- Ignore rótulos de categoria como "Físico", "Químico", "Ergonômico", "Biológico" — extraia somente os nomes dos agentes específicos
+- Se o documento listar riscos separados por vírgula ou em tabela, extraia cada um como item separado da lista
+
 {
   "funcionario":{"nome":null,"cpf":null,"data_nasc":null,"data_adm":null,"matricula":null,"funcao":null,"setor":null},
   "aso":{"tipo_aso":"periodico","data_exame":null,"prox_exame":null,"conclusao":"apto","medico_nome":null,"medico_crm":null},
   "exames":[{"nome":"nome do exame","resultado":"Normal ou Alterado ou Pendente"}],
-  "riscos":["nome do risco 1","nome do risco 2"],
+  "riscos":["risco individual 1","risco individual 2","risco individual 3"],
   "confianca":{"nome":85,"cpf":85,"tipo_aso":80,"data_exame":90,"conclusao":85}
 }`
 
