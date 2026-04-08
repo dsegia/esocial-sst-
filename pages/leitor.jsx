@@ -18,6 +18,7 @@ export default function Leitor() {
   const [progresso, setProgresso] = useState('')
   const [erro, setErro] = useState('')
   const [dados, setDados] = useState(null)
+  const [dadosEditados, setDadosEditados] = useState(null)
   const [empresaId, setEmpresaId] = useState('')
   const [funcionarios, setFuncionarios] = useState([])
   const [funcMatch, setFuncMatch] = useState(null)
@@ -37,14 +38,12 @@ export default function Leitor() {
     })
   }, [])
 
-  // Carrega pdf.js dinamicamente
   async function carregarPDFJS() {
     if (window.pdfjsLib) return window.pdfjsLib
     await new Promise((resolve, reject) => {
       const s = document.createElement('script')
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-      s.onload = resolve
-      s.onerror = reject
+      s.onload = resolve; s.onerror = reject
       document.head.appendChild(s)
     })
     window.pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -52,65 +51,49 @@ export default function Leitor() {
     return window.pdfjsLib
   }
 
-  // Extrai texto do PDF (funciona para PDFs digitais)
   async function extrairTextoPDF(file) {
-    const pdfjsLib = await carregarPDFJS()
-    const arrayBuffer = await file.arrayBuffer()
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-    let textoCompleto = ''
-    const total = Math.min(pdf.numPages, 6)
-    for (let i = 1; i <= total; i++) {
+    const lib = await carregarPDFJS()
+    const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise
+    let txt = ''
+    for (let i = 1; i <= Math.min(pdf.numPages, 6); i++) {
       const page = await pdf.getPage(i)
       const content = await page.getTextContent()
-      const textoPage = content.items.map(item => item.str).join(' ')
-      textoCompleto += textoPage + '\n'
+      txt += content.items.map(it => it.str).join(' ') + '\n'
     }
-    return textoCompleto.trim()
+    return txt.trim()
   }
 
-  // Converte páginas em imagens (para PDFs escaneados)
   async function pdfParaImagens(file) {
-    const pdfjsLib = await carregarPDFJS()
-    const arrayBuffer = await file.arrayBuffer()
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-    const paginas = []
-    const total = Math.min(pdf.numPages, 3)
-    for (let i = 1; i <= total; i++) {
-      setProgresso(`Convertendo página ${i} de ${total}...`)
+    const lib = await carregarPDFJS()
+    const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise
+    const imgs = []
+    for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) {
+      setProgresso(`Convertendo página ${i} de ${Math.min(pdf.numPages, 3)}...`)
       const page = await pdf.getPage(i)
-      const viewport = page.getViewport({ scale: 1.5 })
+      const vp = page.getViewport({ scale: 1.5 })
       const canvas = document.createElement('canvas')
-      canvas.width = viewport.width
-      canvas.height = viewport.height
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
-      paginas.push(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+      canvas.width = vp.width; canvas.height = vp.height
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
+      imgs.push(canvas.toDataURL('image/jpeg', 0.85).split(',')[1])
     }
-    return paginas
+    return imgs
   }
 
-  // Lê XML eSocial
   async function lerXML(file) {
-    const texto = await file.text()
-    const doc = new DOMParser().parseFromString(texto, 'text/xml')
+    const txt = await file.text()
+    const doc = new DOMParser().parseFromString(txt, 'text/xml')
     const get = tag => doc.querySelector(tag)?.textContent?.trim() || null
-    const tipoMap = { '0':'admissional','1':'periodico','2':'retorno','3':'mudanca','4':'demissional','5':'monitoracao' }
-    const concMap = { '1':'apto','2':'apto_restricao','3':'inapto' }
+    const tipoMap = {'0':'admissional','1':'periodico','2':'retorno','3':'mudanca','4':'demissional','5':'monitoracao'}
+    const concMap = {'1':'apto','2':'apto_restricao','3':'inapto'}
     return {
-      funcionario: { nome: get('nmTrab'), cpf: get('cpfTrab'), matricula: get('matricula'), funcao: null, setor: null, data_nasc: null, data_adm: null },
-      aso: {
-        tipo_aso: tipoMap[get('tpAso')] || 'periodico',
-        data_exame: formatarData(get('dtAso')),
-        prox_exame: null,
-        conclusao: concMap[get('concl')] || 'apto',
-        medico_nome: get('nmMed'),
-        medico_crm: get('nrCRM'),
-      },
-      exames: [], riscos: [],
-      confianca: { nome:99, cpf:99, tipo_aso:99, data_exame:99, conclusao:99 }
+      funcionario: { nome:get('nmTrab'), cpf:get('cpfTrab'), matricula:get('matricula'), funcao:null, setor:null, data_nasc:null, data_adm:null },
+      aso: { tipo_aso:tipoMap[get('tpAso')]||'periodico', data_exame:fmtData(get('dtAso')), prox_exame:null, conclusao:concMap[get('concl')]||'apto', medico_nome:get('nmMed'), medico_crm:get('nrCRM') },
+      exames:[], riscos:[],
+      confianca:{ nome:99, cpf:99, tipo_aso:99, data_exame:99, conclusao:99 }
     }
   }
 
-  function formatarData(iso) {
+  function fmtData(iso) {
     if (!iso || iso.length < 10) return null
     const [y,m,d] = iso.substring(0,10).split('-')
     return `${d}/${m}/${y}`
@@ -119,34 +102,24 @@ export default function Leitor() {
   async function processarArquivo() {
     if (!arquivo) return
     setErro(''); setEtapa('lendo')
-
     try {
-      // XML — leitura direta
       if (arquivo.name.toLowerCase().endsWith('.xml')) {
         setProgresso('Lendo XML eSocial...')
-        const dadosXML = await lerXML(arquivo)
-        finalizarLeitura(dadosXML, 'XML')
+        finalizar(await lerXML(arquivo), 'XML')
         return
       }
-
-      // PDF — tenta texto primeiro
       setProgresso('Analisando PDF...')
       const texto = await extrairTextoPDF(arquivo)
-      const temTexto = texto.replace(/\s/g, '').length > 100
-
+      const temTexto = texto.replace(/\s/g,'').length > 100
       let payload
 
       if (temTexto) {
-        // PDF digital — manda texto
         setProgresso('PDF digital detectado. Extraindo dados com IA...')
-        setModoLeitura('texto')
         payload = { texto_pdf: texto, paginas: [], tipo: tipoDoc }
       } else {
-        // PDF escaneado — converte em imagens
-        setProgresso('PDF escaneado detectado. Convertendo em imagens...')
-        setModoLeitura('imagem')
+        setProgresso('PDF escaneado. Convertendo em imagens...')
         const paginas = await pdfParaImagens(arquivo)
-        setProgresso(`Analisando ${paginas.length} página(s) com IA...`)
+        setProgresso('Analisando com IA...')
         payload = { paginas, texto_pdf: '', tipo: tipoDoc }
       }
 
@@ -155,83 +128,89 @@ export default function Leitor() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-
       const json = await resp.json()
-
-      if (!resp.ok || !json.sucesso) {
-        // Mostra debug se disponível
-        const msg = json.debug
-          ? `${json.erro}\n\nResposta bruta: ${json.debug}`
-          : json.erro
-        throw new Error(msg)
-      }
-
-      finalizarLeitura(json.dados, json.modo)
-
+      if (!resp.ok || !json.sucesso) throw new Error(json.erro || 'Erro na leitura')
+      finalizar(json.dados, json.modo)
     } catch (err) {
       setErro(err.message)
       setEtapa('upload')
     }
   }
 
-  function finalizarLeitura(dadosExtraidos, modo) {
-    if (dadosExtraidos.funcionario?.cpf) {
-      const cpfLimpo = dadosExtraidos.funcionario.cpf.replace(/\D/g, '')
-      const match = funcionarios.find(f => f.cpf.replace(/\D/g, '') === cpfLimpo)
+  function finalizar(d, modo) {
+    if (d.funcionario?.cpf) {
+      const cpfLimpo = d.funcionario.cpf.replace(/\D/g,'')
+      const match = funcionarios.find(f => f.cpf.replace(/\D/g,'') === cpfLimpo)
       if (match) setFuncMatch(match)
     }
-    setDados(dadosExtraidos)
+    setDados(d)
+    setDadosEditados(JSON.parse(JSON.stringify(d)))
     setModoLeitura(modo)
     setEtapa('preview')
+  }
+
+  function atualizarCampo(path, valor) {
+    setDadosEditados(prev => {
+      const novo = JSON.parse(JSON.stringify(prev))
+      const partes = path.split('.')
+      let obj = novo
+      for (let i = 0; i < partes.length - 1; i++) obj = obj[partes[i]]
+      obj[partes[partes.length - 1]] = valor
+      return novo
+    })
   }
 
   async function salvar() {
     setEtapa('salvando')
     try {
+      const d = dadosEditados
       let funcId = funcMatch?.id
-      if (!funcId && dados.funcionario?.nome) {
-        const { data: novoFunc } = await supabase.from('funcionarios').insert({
+
+      if (!funcId) {
+        const { data: novoFunc, error } = await supabase.from('funcionarios').insert({
           empresa_id: empresaId,
-          nome: dados.funcionario.nome || 'Não identificado',
-          cpf: dados.funcionario.cpf || '000.000.000-00',
-          data_nasc: converterData(dados.funcionario.data_nasc) || '1990-01-01',
-          data_adm: converterData(dados.funcionario.data_adm) || new Date().toISOString().split('T')[0],
-          matricula_esocial: dados.funcionario.matricula || ('AUTO-' + Date.now()),
-          funcao: dados.funcionario.funcao,
-          setor: dados.funcionario.setor,
+          nome: d.funcionario?.nome || 'Não identificado',
+          cpf: d.funcionario?.cpf || '000.000.000-00',
+          data_nasc: converterData(d.funcionario?.data_nasc) || null,
+          data_adm: converterData(d.funcionario?.data_adm) || null,
+          matricula_esocial: d.funcionario?.matricula || ('PEND-' + Date.now()),
+          funcao: d.funcionario?.funcao || null,
+          setor: d.funcionario?.setor || null,
         }).select().single()
-        funcId = novoFunc?.id
+        if (error) throw new Error('Erro ao criar funcionário: ' + error.message)
+        funcId = novoFunc.id
       }
-      if (!funcId) throw new Error('Selecione um funcionário.')
 
       if (tipoDoc === 'aso') {
-        const { data: aso } = await supabase.from('asos').insert({
+        const { data: aso, error } = await supabase.from('asos').insert({
           funcionario_id: funcId, empresa_id: empresaId,
-          tipo_aso: dados.aso?.tipo_aso || 'periodico',
-          data_exame: converterData(dados.aso?.data_exame) || new Date().toISOString().split('T')[0],
-          prox_exame: converterData(dados.aso?.prox_exame) || null,
-          conclusao: dados.aso?.conclusao || 'apto',
-          medico_nome: dados.aso?.medico_nome || null,
-          medico_crm: dados.aso?.medico_crm || null,
-          exames: dados.exames || [],
-          riscos: dados.riscos || [],
+          tipo_aso: d.aso?.tipo_aso || 'periodico',
+          data_exame: converterData(d.aso?.data_exame) || new Date().toISOString().split('T')[0],
+          prox_exame: converterData(d.aso?.prox_exame) || null,
+          conclusao: d.aso?.conclusao || 'apto',
+          medico_nome: d.aso?.medico_nome || null,
+          medico_crm: d.aso?.medico_crm || null,
+          exames: d.exames || [],
+          riscos: d.riscos || [],
         }).select().single()
+        if (error) throw new Error(error.message)
         await supabase.from('transmissoes').insert({
           empresa_id: empresaId, funcionario_id: funcId,
           evento: 'S-2220', referencia_id: aso.id, referencia_tipo: 'aso',
           status: 'pendente', tentativas: 0, ambiente: 'producao_restrita',
         })
       } else {
-        const { data: ltcat } = await supabase.from('ltcats').insert({
+        const { data: ltcat, error } = await supabase.from('ltcats').insert({
           empresa_id: empresaId,
-          data_emissao: converterData(dados.dados_gerais?.data_emissao) || new Date().toISOString().split('T')[0],
-          data_vigencia: converterData(dados.dados_gerais?.data_vigencia) || new Date().toISOString().split('T')[0],
-          prox_revisao: converterData(dados.dados_gerais?.prox_revisao) || null,
-          resp_nome: dados.dados_gerais?.resp_nome || '',
-          resp_conselho: dados.dados_gerais?.resp_conselho || 'CREA',
-          resp_registro: dados.dados_gerais?.resp_registro || null,
-          ghes: dados.ghes || [], ativo: true,
+          data_emissao: converterData(d.dados_gerais?.data_emissao) || new Date().toISOString().split('T')[0],
+          data_vigencia: converterData(d.dados_gerais?.data_vigencia) || new Date().toISOString().split('T')[0],
+          prox_revisao: converterData(d.dados_gerais?.prox_revisao) || null,
+          resp_nome: d.dados_gerais?.resp_nome || '',
+          resp_conselho: d.dados_gerais?.resp_conselho || 'CREA',
+          resp_registro: d.dados_gerais?.resp_registro || null,
+          ghes: d.ghes || [], ativo: true,
         }).select().single()
+        if (error) throw new Error(error.message)
         await supabase.from('transmissoes').insert({
           empresa_id: empresaId, evento: 'S-2240',
           referencia_id: ltcat.id, referencia_tipo: 'ltcat',
@@ -251,43 +230,27 @@ export default function Leitor() {
     return p.length === 3 ? `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}` : null
   }
 
-  function corConfianca(v) {
-    if (!v || v < 70) return '#E24B4A'
-    if (v < 90) return '#EF9F27'
-    return '#1D9E75'
-  }
+  function corConf(v) { return !v || v < 70 ? '#E24B4A' : v < 90 ? '#EF9F27' : '#1D9E75' }
 
   return (
     <Layout pagina="leitor">
       <Head><title>Leitor Inteligente — eSocial SST</title></Head>
-
       <div style={s.header}>
         <div>
           <div style={s.titulo}>Leitor inteligente de documentos</div>
-          <div style={s.sub}>PDF ou XML → campos extraídos automaticamente → confirmar → salvar</div>
+          <div style={s.sub}>PDF ou XML → extração automática → confirmar → salvar</div>
         </div>
         <div style={{ display:'flex', gap:6 }}>
-          {['aso','ltcat'].map(t => (
-            <button key={t} onClick={() => setTipoDoc(t)} style={{
+          {[['aso','ASO (S-2220)','#185FA5'],['ltcat','LTCAT (S-2240)','#854F0B']].map(([k,l,c]) => (
+            <button key={k} onClick={() => setTipoDoc(k)} style={{
               padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:500, cursor:'pointer', border:'none',
-              background: tipoDoc===t ? (t==='aso'?'#185FA5':'#EF9F27') : '#f3f4f6',
-              color: tipoDoc===t ? '#fff' : '#6b7280',
-            }}>{t==='aso'?'ASO (S-2220)':'LTCAT (S-2240)'}</button>
+              background: tipoDoc===k ? c : '#f3f4f6', color: tipoDoc===k ? '#fff' : '#6b7280',
+            }}>{l}</button>
           ))}
         </div>
       </div>
 
-      {erro && (
-        <div style={s.erroBox}>
-          <strong>Erro:</strong> {erro.split('\n')[0]}
-          {erro.includes('bruta') && (
-            <details style={{ marginTop:6, fontSize:11 }}>
-              <summary style={{ cursor:'pointer' }}>Ver resposta bruta</summary>
-              <pre style={{ marginTop:4, whiteSpace:'pre-wrap', wordBreak:'break-all' }}>{erro.split('\n').slice(2).join('\n')}</pre>
-            </details>
-          )}
-        </div>
-      )}
+      {erro && <div style={s.erroBox}><strong>Erro:</strong> {erro}</div>}
 
       {etapa === 'upload' && (
         <div style={s.card}>
@@ -302,54 +265,49 @@ export default function Leitor() {
               {arquivo ? arquivo.name : 'Clique ou arraste o arquivo aqui'}
             </div>
             <div style={{ fontSize:12, color:'#9ca3af', marginTop:4 }}>PDF (digital ou escaneado) · XML eSocial</div>
-            {arquivo && <div style={{ marginTop:8, fontSize:12, color:'#185FA5', fontWeight:500 }}>✓ {arquivo.name} ({(arquivo.size/1024).toFixed(0)} KB)</div>}
+            {arquivo && <div style={{ marginTop:8, fontSize:12, color:'#185FA5', fontWeight:500 }}>✓ {arquivo.name} ({(arquivo.size/1024).toFixed(0)} KB) — pronto</div>}
           </div>
-          <input ref={inputRef} type="file" accept=".pdf,.xml" style={{ display:'none' }}
-            onChange={e => setArquivo(e.target.files[0])} />
-          {arquivo && (
-            <button style={{ ...s.btnPrimary, marginTop:12, width:'100%' }} onClick={processarArquivo}>
-              Ler documento com IA →
-            </button>
-          )}
-          <div style={{ marginTop:14, padding:'12px 14px', background:'#f9fafb', borderRadius:8, fontSize:12, color:'#6b7280', lineHeight:1.9 }}>
-            <strong>Como funciona:</strong><br/>
-            • PDF digital (gerado no computador): extração de texto direta — rápida e precisa<br/>
-            • PDF escaneado (foto/scan): conversão em imagem + análise visual com IA<br/>
-            • XML eSocial: leitura direta dos campos estruturados
+          <input ref={inputRef} type="file" accept=".pdf,.xml" style={{ display:'none' }} onChange={e => setArquivo(e.target.files[0])} />
+          {arquivo && <button style={{ ...s.btnPrimary, marginTop:12, width:'100%' }} onClick={processarArquivo}>Ler documento com IA →</button>}
+          <div style={{ marginTop:12, padding:'10px 14px', background:'#f9fafb', borderRadius:8, fontSize:12, color:'#6b7280', lineHeight:1.9 }}>
+            <strong>Como funciona:</strong> PDF digital → extração direta de texto (rápido e preciso) · PDF escaneado → análise visual com IA · XML eSocial → leitura direta dos campos
           </div>
         </div>
       )}
 
       {etapa === 'lendo' && (
         <div style={{ ...s.card, textAlign:'center', padding:'3rem' }}>
-          <div style={{ width:50, height:50, border:'3px solid #185FA5', borderTopColor:'transparent', borderRadius:'50%', margin:'0 auto 16px', animation:'spin 1s linear infinite' }}></div>
-          <div style={{ fontSize:14, fontWeight:500, color:'#111', marginBottom:6 }}>Processando documento...</div>
+          <div style={{ width:48, height:48, border:'3px solid #185FA5', borderTopColor:'transparent', borderRadius:'50%', margin:'0 auto 14px', animation:'spin 1s linear infinite' }}></div>
+          <div style={{ fontSize:14, fontWeight:500, color:'#111', marginBottom:4 }}>Processando documento...</div>
           <div style={{ fontSize:12, color:'#6b7280' }}>{progresso}</div>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
 
-      {etapa === 'preview' && dados && (
+      {etapa === 'preview' && dadosEditados && (
         <div style={{ ...s.card, border:'1.5px solid #1D9E75' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'#085041' }}>Dados extraídos — confira e corrija se necessário</div>
-            <span style={{ fontSize:11, background:'#E6F1FB', color:'#0C447C', padding:'2px 10px', borderRadius:99, fontWeight:500 }}>
-              {modoLeitura === 'texto' ? 'PDF digital' : modoLeitura === 'XML' ? 'XML eSocial' : 'PDF escaneado'}
-            </span>
+            <div style={{ fontSize:13, fontWeight:600, color:'#085041' }}>Dados extraídos — edite se necessário e confirme</div>
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              <span style={{ fontSize:11, background:'#E6F1FB', color:'#0C447C', padding:'2px 10px', borderRadius:99 }}>
+                {modoLeitura === 'texto' ? '📄 PDF digital' : modoLeitura === 'XML' ? '🔧 XML eSocial' : '📷 PDF escaneado'}
+              </span>
+              <span style={{ fontSize:10, color:'#6b7280' }}>● verde = alta confiança · amarelo = verificar · vermelho = preencher</span>
+            </div>
           </div>
 
-          {tipoDoc === 'aso' && dados.funcionario && (
-            <div style={{ marginBottom:14 }}>
+          {tipoDoc === 'aso' && dadosEditados.funcionario && (
+            <div style={{ marginBottom:16 }}>
               <div style={s.secLabel}>Funcionário</div>
               {funcMatch ? (
-                <div style={{ background:'#EAF3DE', border:'0.5px solid #9FE1CB', borderRadius:8, padding:'9px 12px', fontSize:12, color:'#085041', marginBottom:10 }}>
-                  ✓ Encontrado no cadastro: <strong>{funcMatch.nome}</strong>
-                  <button onClick={() => setFuncMatch(null)} style={{ marginLeft:10, fontSize:11, color:'#E24B4A', background:'none', border:'none', cursor:'pointer' }}>Trocar</button>
+                <div style={{ background:'#EAF3DE', border:'0.5px solid #9FE1CB', borderRadius:8, padding:'9px 12px', fontSize:12, color:'#085041', marginBottom:10, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <span>✓ Encontrado no cadastro: <strong>{funcMatch.nome}</strong> — {funcMatch.cpf}</span>
+                  <button onClick={() => setFuncMatch(null)} style={{ fontSize:11, color:'#E24B4A', background:'none', border:'none', cursor:'pointer' }}>Trocar</button>
                 </div>
               ) : (
                 <div style={{ marginBottom:10 }}>
                   <div style={{ background:'#FAEEDA', border:'0.5px solid #FAC775', borderRadius:8, padding:'8px 12px', fontSize:12, color:'#633806', marginBottom:6 }}>
-                    CPF não encontrado no cadastro. Selecione ou será criado novo.
+                    CPF não encontrado no cadastro. Selecione um existente ou será criado novo funcionário.
                   </div>
                   <select style={s.input} onChange={e => setFuncMatch(funcionarios.find(f=>f.id===e.target.value)||null)}>
                     <option value="">— criar novo com dados do documento —</option>
@@ -358,34 +316,34 @@ export default function Leitor() {
                 </div>
               )}
               <div style={s.grid2}>
-                {campo('Nome', dados.funcionario.nome, dados.confianca?.nome)}
-                {campo('CPF', dados.funcionario.cpf, dados.confianca?.cpf)}
-                {campo('Função', dados.funcionario.funcao, 70)}
-                {campo('Setor', dados.funcionario.setor, 70)}
+                {campoEdit('Nome', dadosEditados.funcionario.nome, dadosEditados.confianca?.nome, v => atualizarCampo('funcionario.nome', v))}
+                {campoEdit('CPF', dadosEditados.funcionario.cpf, dadosEditados.confianca?.cpf, v => atualizarCampo('funcionario.cpf', v))}
+                {campoEdit('Função', dadosEditados.funcionario.funcao, 70, v => atualizarCampo('funcionario.funcao', v))}
+                {campoEdit('Setor / GHE', dadosEditados.funcionario.setor, 70, v => atualizarCampo('funcionario.setor', v))}
               </div>
             </div>
           )}
 
-          {tipoDoc === 'aso' && dados.aso && (
-            <div style={{ marginBottom:14 }}>
+          {tipoDoc === 'aso' && dadosEditados.aso && (
+            <div style={{ marginBottom:16 }}>
               <div style={s.secLabel}>Dados do ASO</div>
               <div style={s.grid2}>
-                {campo('Tipo', dados.aso.tipo_aso, dados.confianca?.tipo_aso)}
-                {campo('Conclusão', dados.aso.conclusao, dados.confianca?.conclusao)}
-                {campo('Data do exame', dados.aso.data_exame, dados.confianca?.data_exame)}
-                {campo('Próximo exame', dados.aso.prox_exame, 75)}
-                {campo('Médico', dados.aso.medico_nome, 80)}
-                {campo('CRM', dados.aso.medico_crm, dados.confianca?.medico_crm)}
+                {campoEdit('Tipo de exame', dadosEditados.aso.tipo_aso, dadosEditados.confianca?.tipo_aso, v => atualizarCampo('aso.tipo_aso', v))}
+                {campoEdit('Conclusão', dadosEditados.aso.conclusao, dadosEditados.confianca?.conclusao, v => atualizarCampo('aso.conclusao', v))}
+                {campoEdit('Data do exame', dadosEditados.aso.data_exame, dadosEditados.confianca?.data_exame, v => atualizarCampo('aso.data_exame', v))}
+                {campoEdit('Próximo exame', dadosEditados.aso.prox_exame, 75, v => atualizarCampo('aso.prox_exame', v))}
+                {campoEdit('Médico', dadosEditados.aso.medico_nome, 80, v => atualizarCampo('aso.medico_nome', v))}
+                {campoEdit('CRM', dadosEditados.aso.medico_crm, dadosEditados.confianca?.medico_crm, v => atualizarCampo('aso.medico_crm', v))}
               </div>
             </div>
           )}
 
-          {tipoDoc === 'aso' && dados.exames?.length > 0 && (
-            <div style={{ marginBottom:14 }}>
-              <div style={s.secLabel}>Exames ({dados.exames.length})</div>
+          {tipoDoc === 'aso' && dadosEditados.exames?.length > 0 && (
+            <div style={{ marginBottom:16 }}>
+              <div style={s.secLabel}>Exames realizados ({dadosEditados.exames.length})</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {dados.exames.map((ex, i) => (
-                  <span key={i} style={{ padding:'3px 10px', borderRadius:99, fontSize:11, fontWeight:500,
+                {dadosEditados.exames.map((ex, i) => (
+                  <span key={i} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:500,
                     background: ex.resultado==='Normal'?'#EAF3DE':ex.resultado==='Alterado'?'#FCEBEB':'#FAEEDA',
                     color: ex.resultado==='Normal'?'#085041':ex.resultado==='Alterado'?'#791F1F':'#633806' }}>
                     {ex.nome}: {ex.resultado}
@@ -395,24 +353,36 @@ export default function Leitor() {
             </div>
           )}
 
-          {tipoDoc === 'ltcat' && dados.dados_gerais && (
-            <div style={{ marginBottom:14 }}>
+          {tipoDoc === 'aso' && dadosEditados.riscos?.length > 0 && (
+            <div style={{ marginBottom:16 }}>
+              <div style={s.secLabel}>Riscos identificados ({dadosEditados.riscos.length})</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {dadosEditados.riscos.map((r, i) => (
+                  <span key={i} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, background:'#FAEEDA', color:'#633806' }}>{r}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tipoDoc === 'ltcat' && dadosEditados.dados_gerais && (
+            <div style={{ marginBottom:16 }}>
               <div style={s.secLabel}>Dados gerais do LTCAT</div>
               <div style={s.grid2}>
-                {campo('Data emissão', dados.dados_gerais.data_emissao, dados.confianca?.data_emissao)}
-                {campo('Próxima revisão', dados.dados_gerais.prox_revisao, 80)}
-                {campo('Responsável', dados.dados_gerais.resp_nome, dados.confianca?.resp_nome)}
-                {campo('Conselho/Registro', `${dados.dados_gerais.resp_conselho||''} ${dados.dados_gerais.resp_registro||''}`.trim(), 85)}
+                {campoEdit('Data emissão', dadosEditados.dados_gerais.data_emissao, dadosEditados.confianca?.data_emissao, v => atualizarCampo('dados_gerais.data_emissao', v))}
+                {campoEdit('Próxima revisão', dadosEditados.dados_gerais.prox_revisao, 80, v => atualizarCampo('dados_gerais.prox_revisao', v))}
+                {campoEdit('Responsável', dadosEditados.dados_gerais.resp_nome, dadosEditados.confianca?.resp_nome, v => atualizarCampo('dados_gerais.resp_nome', v))}
+                {campoEdit('Conselho', dadosEditados.dados_gerais.resp_conselho, 85, v => atualizarCampo('dados_gerais.resp_conselho', v))}
+                {campoEdit('Registro', dadosEditados.dados_gerais.resp_registro, 85, v => atualizarCampo('dados_gerais.resp_registro', v))}
               </div>
-              {dados.ghes?.length > 0 && (
-                <div style={{ fontSize:12, color:'#374151', marginTop:8 }}>
-                  {dados.ghes.length} GHE(s) · {dados.ghes.reduce((a,g)=>a+(g.agentes?.length||0),0)} agente(s) de risco
+              {dadosEditados.ghes?.length > 0 && (
+                <div style={{ fontSize:12, color:'#374151', marginTop:8, padding:'8px 12px', background:'#f9fafb', borderRadius:8 }}>
+                  {dadosEditados.ghes.length} GHE(s) identificado(s) com {dadosEditados.ghes.reduce((a,g)=>a+(g.agentes?.length||0),0)} agente(s) de risco
                 </div>
               )}
             </div>
           )}
 
-          <div style={{ display:'flex', gap:10, marginTop:4 }}>
+          <div style={{ display:'flex', gap:10, marginTop:8 }}>
             <button style={s.btnPrimary} onClick={salvar}>Confirmar e salvar →</button>
             <button style={s.btnOutline} onClick={() => { setEtapa('upload'); setDados(null); setArquivo(null); setFuncMatch(null) }}>Cancelar</button>
           </div>
@@ -421,7 +391,7 @@ export default function Leitor() {
 
       {etapa === 'salvando' && (
         <div style={{ ...s.card, textAlign:'center', padding:'3rem' }}>
-          <div style={{ fontSize:14, fontWeight:500, color:'#111' }}>Salvando...</div>
+          <div style={{ fontSize:14, fontWeight:500, color:'#111' }}>Salvando no banco...</div>
         </div>
       )}
 
@@ -431,7 +401,7 @@ export default function Leitor() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <div style={{ fontSize:15, fontWeight:600, color:'#085041', marginBottom:6 }}>Salvo com sucesso!</div>
-          <div style={{ fontSize:13, color:'#374151', marginBottom:20 }}>Transmissão agendada como pendente.</div>
+          <div style={{ fontSize:13, color:'#374151', marginBottom:20 }}>Documento salvo e transmissão registrada como pendente.</div>
           <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
             <button style={s.btnPrimary} onClick={() => { setEtapa('upload'); setDados(null); setArquivo(null); setFuncMatch(null) }}>Ler outro documento</button>
             <button style={s.btnOutline} onClick={() => router.push('/historico')}>Ver histórico →</button>
@@ -441,15 +411,17 @@ export default function Leitor() {
     </Layout>
   )
 
-  function campo(label, valor, confianca) {
-    const cor = corConfianca(confianca)
+  function campoEdit(label, valor, confianca, onChange) {
+    const cor = corConf(confianca)
     return (
       <div key={label} style={{ marginBottom:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
           <span style={{ fontSize:11, fontWeight:500, color:'#374151' }}>{label}</span>
-          <span style={{ width:7, height:7, borderRadius:'50%', background:cor, display:'inline-block' }}></span>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:cor, display:'inline-block', flexShrink:0 }} title={`Confiança: ${confianca||0}%`}></span>
         </div>
-        <input style={{ ...s.input, borderColor: cor+'44' }} defaultValue={valor || ''} />
+        <input style={{ ...s.input, borderColor: cor + '66' }}
+          defaultValue={valor || ''}
+          onChange={e => onChange(e.target.value)} />
       </div>
     )
   }
@@ -463,7 +435,7 @@ const s = {
   dropZone: { border:'2px dashed #d1d5db', borderRadius:10, padding:'2.5rem', textAlign:'center', cursor:'pointer', transition:'border-color .15s' },
   secLabel: { fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 },
   grid2:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 },
-  input:    { width:'100%', padding:'7px 10px', fontSize:13, border:'1px solid #d1d5db', borderRadius:7, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' },
+  input:    { width:'100%', padding:'7px 10px', fontSize:13, border:'1px solid #d1d5db', borderRadius:7, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit', outline:'none' },
   erroBox:  { background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12, lineHeight:1.6 },
   btnPrimary: { padding:'10px 20px', background:'#185FA5', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' },
   btnOutline: { padding:'10px 20px', background:'transparent', color:'#374151', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer' },
