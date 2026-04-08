@@ -182,6 +182,32 @@ export default function Leitor() {
       }
 
       if (tipoDoc === 'aso') {
+        // ── VERIFICAR DUPLICIDADE ──────────────────────
+        const dataExame = converterData(d.aso?.data_exame) || new Date().toISOString().split('T')[0]
+        const dupResp = await fetch('/api/verificar-duplicidade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            funcionario_id: funcId,
+            tipo_aso: d.aso?.tipo_aso || 'periodico',
+            data_exame: dataExame,
+          })
+        })
+        const dup = await dupResp.json()
+
+        if (dup.duplicado) {
+          const dataFmt = new Date(dup.data_exame + 'T12:00:00').toLocaleDateString('pt-BR')
+          const msg = dup.jaTransmitido
+            ? `⚠️ ASO DUPLICADO E JÁ TRANSMITIDO!\n\nJá existe um ASO ${dup.tipo_aso} para ${dup.funcionario} em ${dataFmt} com recibo de transmissão.\n\nDeseja salvar mesmo assim como retificação?`
+            : `⚠️ ASO DUPLICADO!\n\nJá existe um ASO ${dup.tipo_aso} para ${dup.funcionario} em ${dataFmt}.\n\nDeseja salvar mesmo assim?`
+
+          if (!confirm(msg)) {
+            setEtapa('preview')
+            return
+          }
+        }
+        // ───────────────────────────────────────────────
+
         const { data: aso, error } = await supabase.from('asos').insert({
           funcionario_id: funcId, empresa_id: empresaId,
           tipo_aso: d.aso?.tipo_aso || 'periodico',
@@ -340,27 +366,61 @@ export default function Leitor() {
 
           {tipoDoc === 'aso' && dadosEditados.exames?.length > 0 && (
             <div style={{ marginBottom:16 }}>
-              <div style={s.secLabel}>Exames realizados ({dadosEditados.exames.length})</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {dadosEditados.exames.map((ex, i) => (
-                  <span key={i} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:500,
-                    background: ex.resultado==='Normal'?'#EAF3DE':ex.resultado==='Alterado'?'#FCEBEB':'#FAEEDA',
-                    color: ex.resultado==='Normal'?'#085041':ex.resultado==='Alterado'?'#791F1F':'#633806' }}>
-                    {ex.nome}: {ex.resultado}
-                  </span>
-                ))}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div style={s.secLabel}>Exames realizados ({dadosEditados.exames.length}) — Tabela 27 eSocial</div>
+                <span style={{ fontSize:10, color:'#9ca3af' }}>Código = Tabela 27 obrigatória na transmissão</span>
               </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {dadosEditados.exames.map((ex, i) => {
+                  const bg = ex.resultado==='Normal'?'#EAF3DE':ex.resultado==='Alterado'?'#FCEBEB':'#FAEEDA'
+                  const cor = ex.resultado==='Normal'?'#085041':ex.resultado==='Alterado'?'#791F1F':'#633806'
+                  return (
+                    <div key={i} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, fontWeight:500, background:bg, color:cor, display:'flex', alignItems:'center', gap:6 }}>
+                      <span>{ex.nome}: {ex.resultado}</span>
+                      {ex.codigo_t27 && (
+                        <span style={{ padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, background:'rgba(0,0,0,0.1)', fontFamily:'monospace' }}>
+                          T27:{ex.codigo_t27}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {dadosEditados.exames.some(e => e.codigo_t27 === '0200') && (
+                <div style={{ marginTop:6, fontSize:11, color:'#EF9F27' }}>
+                  ⚠ Exames com código 0200 (Outros) — verifique se estão corretos antes de transmitir.
+                </div>
+              )}
             </div>
           )}
 
-          {tipoDoc === 'aso' && dadosEditados.riscos?.length > 0 && (
+          {tipoDoc === 'aso' && (dadosEditados.riscos?.length > 0 || dadosEditados.riscos_codificados?.length > 0) && (
             <div style={{ marginBottom:16 }}>
-              <div style={s.secLabel}>Riscos identificados ({dadosEditados.riscos.length})</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {dadosEditados.riscos.map((r, i) => (
-                  <span key={i} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, background:'#FAEEDA', color:'#633806' }}>{r}</span>
-                ))}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div style={s.secLabel}>Riscos identificados — Tabela 24 eSocial (Aposentadoria Especial)</div>
+                <span style={{ fontSize:10, color:'#9ca3af' }}>Código = obrigatório no S-2240</span>
               </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {(dadosEditados.riscos_codificados || dadosEditados.riscos?.map(r=>({nome:r,codigo_t24:'09.01.001',tipo:'aus'}))).map((r, i) => {
+                  const COR_TIPO = { fis:'#E6F1FB', qui:'#FAEEDA', bio:'#EAF3DE', aus:'#f3f4f6', out:'#FAEEDA' }
+                  const TXT_TIPO = { fis:'#0C447C', qui:'#633806', bio:'#27500A', aus:'#6b7280', out:'#633806' }
+                  const bg  = COR_TIPO[r.tipo] || '#f3f4f6'
+                  const cor = TXT_TIPO[r.tipo] || '#374151'
+                  return (
+                    <div key={i} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, fontWeight:500, background:bg, color:cor, display:'flex', alignItems:'center', gap:6 }}>
+                      <span>{r.nome}</span>
+                      <span style={{ padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, background:'rgba(0,0,0,0.1)', fontFamily:'monospace' }}>
+                        T24:{r.codigo_t24}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              {(dadosEditados.riscos_codificados || []).some(r => !r.codigo_t24?.startsWith('09')) && (
+                <div style={{ marginTop:6, fontSize:11, color:'#E24B4A', fontWeight:500 }}>
+                  ⚠ Agentes nocivos identificados — trabalhador pode ter direito à aposentadoria especial.
+                </div>
+              )}
             </div>
           )}
 
