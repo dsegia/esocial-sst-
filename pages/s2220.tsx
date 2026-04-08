@@ -17,8 +17,6 @@ export default function S2220() {
   const [transmissoes, setTransmissoes] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState('todos')
-  const [transmitindo, setTransmitindo] = useState(false)
-  const [selecionados, setSelecionados] = useState([])
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
 
@@ -27,14 +25,22 @@ export default function S2220() {
   async function init() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/'); return }
-    const { data: user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
+    const { data: user } = await supabase.from('usuarios')
+      .select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
     setEmpresaId(user.empresa_id)
 
     const [funcsRes, asosRes, txRes] = await Promise.all([
-      supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc').eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome'),
-      supabase.from('asos').select('*').eq('empresa_id', user.empresa_id).order('data_exame', { ascending: false }),
-      supabase.from('transmissoes').select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em').eq('empresa_id', user.empresa_id).eq('evento', 'S-2220').order('criado_em', { ascending: false }),
+      supabase.from('funcionarios')
+        .select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc')
+        .eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome'),
+      supabase.from('asos').select('*')
+        .eq('empresa_id', user.empresa_id)
+        .order('data_exame', { ascending: false }),
+      supabase.from('transmissoes')
+        .select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em,erro_descricao')
+        .eq('empresa_id', user.empresa_id).eq('evento', 'S-2220')
+        .order('criado_em', { ascending: false }),
     ])
 
     setFuncionarios(funcsRes.data || [])
@@ -44,56 +50,57 @@ export default function S2220() {
   }
 
   function ultimoAso(funcId) {
-    return asos.filter(a => a.funcionario_id === funcId).sort((a,b) => new Date(b.data_exame)-new Date(a.data_exame))[0] || null
+    return asos
+      .filter(a => a.funcionario_id === funcId)
+      .sort((a,b) => new Date(b.data_exame) - new Date(a.data_exame))[0] || null
   }
 
   function ultimaTx(funcId) {
     return transmissoes.filter(t => t.funcionario_id === funcId)[0] || null
   }
 
-  function statusFuncionario(func) {
-    const aso = ultimoAso(func.id)
-    const tx  = ultimaTx(func.id)
-    const dadosOk = func.data_adm && func.data_nasc && func.matricula_esocial && !func.matricula_esocial.startsWith('PEND-')
+  function diasParaVencer(d) {
+    if (!d) return null
+    return Math.round((new Date(d) - new Date()) / 86400000)
+  }
 
-    if (!aso) return { label:'Sem ASO', cor:'#E24B4A', bg:'#FCEBEB', pode:false, motivo:'Sem ASO cadastrado' }
+  function statusFuncionario(func) {
+    const aso   = ultimoAso(func.id)
+    const tx    = ultimaTx(func.id)
+    const dadosOk = func.data_adm && func.data_nasc &&
+                    func.matricula_esocial && !func.matricula_esocial.startsWith('PEND-')
+
+    if (!aso)     return { label:'Sem ASO',          cor:'#E24B4A', bg:'#FCEBEB', pode:false, motivo:'Importe ou cadastre um ASO' }
     if (!dadosOk) return { label:'Dados incompletos', cor:'#EF9F27', bg:'#FAEEDA', pode:false, motivo:'Faltam: admissão, nascimento ou matrícula eSocial' }
 
-    const dias = aso.prox_exame ? Math.round((new Date(aso.prox_exame)-new Date())/86400000) : null
-    if (dias !== null && dias < 0) return { label:'ASO vencido', cor:'#E24B4A', bg:'#FCEBEB', pode:true, motivo:'ASO vencido — transmissão pendente' }
+    const dias = diasParaVencer(aso.prox_exame)
+    const vencido = dias !== null && dias < 0
 
-    if (!tx) return { label:'Pendente envio', cor:'#EF9F27', bg:'#FAEEDA', pode:true, motivo:'ASO cadastrado mas não transmitido' }
-    if (tx.status === 'enviado') return { label:'Transmitido', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:`Recibo: ${tx.recibo||'—'}` }
-    if (tx.status === 'pendente') return { label:'Aguardando', cor:'#EF9F27', bg:'#FAEEDA', pode:true, motivo:'Transmissão pendente' }
-    if (tx.status === 'rejeitado') return { label:'Rejeitado', cor:'#E24B4A', bg:'#FCEBEB', pode:true, motivo:'Transmissão rejeitada — corrigir e retransmitir' }
+    if (!tx) return { label:'Pendente envio', cor:'#EF9F27', bg:'#FAEEDA', pode:true, motivo:'ASO cadastrado — aguardando transmissão' }
+
+    if (tx.status === 'enviado')   return { label:'Transmitido',    cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:`Recibo: ${tx.recibo||'—'}` }
+    if (tx.status === 'pendente')  return { label:'Aguardando',     cor:'#EF9F27', bg:'#FAEEDA', pode:true,  motivo:'Transmissão pendente' }
+    if (tx.status === 'rejeitado') return { label:'Rejeitado',      cor:'#E24B4A', bg:'#FCEBEB', pode:true,  motivo:tx.erro_descricao||'Verifique o erro e retransmita' }
+
+    if (vencido) return { label:'ASO vencido', cor:'#E24B4A', bg:'#FCEBEB', pode:true, motivo:`Vencido há ${Math.abs(dias)} dias` }
 
     return { label:'Em dia', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:'' }
   }
 
   const funcsFiltradas = funcionarios.filter(f => {
     const st = statusFuncionario(f)
-    if (filtro === 'todos') return true
+    if (filtro === 'todos')    return true
     if (filtro === 'pendente') return st.pode
-    if (filtro === 'ok') return !st.pode && st.label === 'Transmitido'
-    if (filtro === 'problema') return st.label === 'Sem ASO' || st.label === 'Dados incompletos' || st.label === 'Rejeitado'
+    if (filtro === 'ok')       return st.label === 'Transmitido'
+    if (filtro === 'problema') return ['Sem ASO','Dados incompletos','Rejeitado','ASO vencido'].includes(st.label)
     return true
   })
 
-  const prontos = funcionarios.filter(f => statusFuncionario(f).pode)
-
-  async function transmitirSelecionados(ids) {
-    if (!ids.length) return
-    setTransmitindo(true); setErro(''); setSucesso('')
-    // Buscar transmissões pendentes desses funcionários
-    const { data: txsPendentes } = await supabase.from('transmissoes')
-      .select('id').eq('evento', 'S-2220').eq('status', 'pendente').in('funcionario_id', ids)
-    if (!txsPendentes?.length) {
-      setErro('Nenhuma transmissão pendente para os selecionados.')
-      setTransmitindo(false); return
-    }
-    router.push('/transmissao-manual')
-    setTransmitindo(false)
-  }
+  const prontos   = funcionarios.filter(f => statusFuncionario(f).pode)
+  const problemas = funcionarios.filter(f =>
+    ['Sem ASO','Dados incompletos','Rejeitado','ASO vencido'].includes(statusFuncionario(f).label)
+  )
+  const transmitidos = funcionarios.filter(f => statusFuncionario(f).label === 'Transmitido')
 
   if (carregando) return <div style={s.loading}>Carregando...</div>
 
@@ -104,30 +111,49 @@ export default function S2220() {
       <div style={s.header}>
         <div>
           <div style={s.titulo}>S-2220 — Monitoramento da Saúde do Trabalhador</div>
-          <div style={s.sub}>{prontos.length} funcionário(s) com transmissão pendente</div>
+          <div style={s.sub}>
+            {prontos.length} pendente(s) · {transmitidos.length} transmitido(s) · {problemas.length} com problema
+          </div>
         </div>
         <div style={{ display:'flex', gap:8 }}>
-          <button style={s.btnOutline} onClick={() => router.push('/leitor')}>↑ Importar ASO</button>
-          <button style={s.btnPrimary} onClick={() => transmitirSelecionados(prontos.map(f=>f.id))} disabled={!prontos.length || transmitindo}>
-            📡 Transmitir todos prontos ({prontos.length})
+          <button style={s.btnOutline} onClick={() => router.push('/leitor')}>
+            ↑ Importar ASO (PDF/XML)
           </button>
+          {prontos.length > 0 && (
+            <button style={s.btnPrimary} onClick={() => router.push('/transmissao-manual')}>
+              📡 Transmitir pendentes ({prontos.length})
+            </button>
+          )}
         </div>
       </div>
 
       {sucesso && <div style={s.sucessoBox}>{sucesso}</div>}
       {erro    && <div style={s.erroBox}>{erro}</div>}
 
+      {/* Resumo ação em massa */}
+      {prontos.length > 0 && (
+        <div style={{ background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:10, padding:'10px 16px', marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ fontSize:13, color:'#374151' }}>
+            <strong style={{ color:'#EF9F27' }}>{prontos.length}</strong> funcionário(s) com transmissão S-2220 pendente
+          </div>
+          <button style={s.btnPrimary} onClick={() => router.push('/transmissao-manual')}>
+            📡 Ir para transmissão
+          </button>
+        </div>
+      )}
+
       {/* Filtros */}
-      <div style={{ display:'flex', gap:6, marginBottom:14, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
         {[
           { k:'todos',    l:`Todos (${funcionarios.length})` },
-          { k:'pendente', l:`Prontos para transmitir (${funcionarios.filter(f=>statusFuncionario(f).pode).length})` },
-          { k:'ok',       l:`Transmitidos (${funcionarios.filter(f=>statusFuncionario(f).label==='Transmitido').length})` },
-          { k:'problema', l:`Com problema (${funcionarios.filter(f=>['Sem ASO','Dados incompletos','Rejeitado'].includes(statusFuncionario(f).label)).length})` },
+          { k:'pendente', l:`Pendentes (${prontos.length})` },
+          { k:'ok',       l:`Transmitidos (${transmitidos.length})` },
+          { k:'problema', l:`Problemas (${problemas.length})` },
         ].map(f => (
           <button key={f.k} onClick={() => setFiltro(f.k)} style={{
             padding:'5px 12px', fontSize:12, fontWeight:500, borderRadius:99, cursor:'pointer', border:'none',
-            background: filtro===f.k?'#185FA5':'#f3f4f6', color: filtro===f.k?'#fff':'#374151',
+            background: filtro===f.k?'#185FA5':'#f3f4f6',
+            color:      filtro===f.k?'#fff':'#374151',
           }}>{f.l}</button>
         ))}
       </div>
@@ -144,64 +170,118 @@ export default function S2220() {
           </thead>
           <tbody>
             {funcsFiltradas.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign:'center', padding:'2rem', color:'#9ca3af', fontSize:13 }}>
-                Nenhum funcionário neste filtro.
-              </td></tr>
+              <tr>
+                <td colSpan={7} style={{ textAlign:'center', padding:'2rem', color:'#9ca3af', fontSize:13 }}>
+                  Nenhum funcionário neste filtro.
+                </td>
+              </tr>
             ) : funcsFiltradas.map(f => {
               const aso = ultimoAso(f.id)
               const tx  = ultimaTx(f.id)
               const st  = statusFuncionario(f)
+              const dias = aso?.prox_exame ? diasParaVencer(aso.prox_exame) : null
               return (
                 <tr key={f.id} style={{ borderBottom:'0.5px solid #f3f4f6' }}>
+
+                  {/* Funcionário */}
                   <td style={s.td}>
                     <div style={{ fontWeight:500 }}>{f.nome}</div>
                     <div style={{ fontSize:11, color:'#9ca3af' }}>{f.funcao||'—'} · {f.setor||'—'}</div>
                   </td>
+
+                  {/* Matrícula */}
                   <td style={{ ...s.td, fontFamily:'monospace', fontSize:11 }}>
-                    {f.matricula_esocial?.startsWith('PEND-') ? <span style={{ color:'#EF9F27' }}>Pendente</span> : f.matricula_esocial||'—'}
+                    {f.matricula_esocial?.startsWith('PEND-')
+                      ? <span style={{ color:'#EF9F27' }}>Pendente</span>
+                      : f.matricula_esocial || '—'}
                   </td>
+
+                  {/* Último ASO */}
                   <td style={s.td}>
                     {aso ? (
                       <div>
-                        <div style={{ fontSize:12 }}>{new Date(aso.data_exame+'T12:00:00').toLocaleDateString('pt-BR')}</div>
-                        <div style={{ fontSize:10, color:'#9ca3af' }}>{aso.tipo_aso} · {aso.conclusao}</div>
+                        <div style={{ fontSize:12 }}>
+                          {new Date(aso.data_exame+'T12:00:00').toLocaleDateString('pt-BR')}
+                        </div>
+                        <div style={{ fontSize:10, color:'#9ca3af' }}>
+                          {aso.tipo_aso} · {aso.conclusao}
+                        </div>
+                        {aso.medico_nome && (
+                          <div style={{ fontSize:10, color:'#9ca3af' }}>{aso.medico_nome}</div>
+                        )}
                       </div>
-                    ) : <span style={{ color:'#E24B4A', fontSize:12 }}>Sem ASO</span>}
+                    ) : (
+                      <span style={{ color:'#E24B4A', fontSize:12 }}>Sem ASO</span>
+                    )}
                   </td>
+
+                  {/* Próximo exame */}
                   <td style={s.td}>
                     {aso?.prox_exame ? (
-                      <span style={{ fontSize:12, color: new Date(aso.prox_exame)<new Date()?'#E24B4A':'#374151' }}>
-                        {new Date(aso.prox_exame+'T12:00:00').toLocaleDateString('pt-BR')}
-                      </span>
-                    ) : <span style={{ color:'#9ca3af', fontSize:12 }}>—</span>}
+                      <div>
+                        <div style={{ fontSize:12, color: dias !== null && dias < 0 ? '#E24B4A' : dias !== null && dias <= 30 ? '#EF9F27' : '#374151' }}>
+                          {new Date(aso.prox_exame+'T12:00:00').toLocaleDateString('pt-BR')}
+                        </div>
+                        {dias !== null && (
+                          <div style={{ fontSize:10, color: dias < 0?'#E24B4A': dias<=30?'#EF9F27':'#9ca3af' }}>
+                            {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : `em ${dias} dias`}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color:'#9ca3af', fontSize:12 }}>—</span>
+                    )}
                   </td>
+
+                  {/* Última transmissão */}
                   <td style={s.td}>
                     {tx ? (
                       <div>
-                        <div style={{ fontSize:11 }}>{new Date(tx.criado_em).toLocaleDateString('pt-BR')}</div>
-                        <div style={{ fontSize:10, color:'#9ca3af', fontFamily:'monospace' }}>{tx.recibo ? tx.recibo.substring(0,12)+'...' : '—'}</div>
+                        <div style={{ fontSize:11 }}>
+                          {new Date(tx.criado_em).toLocaleDateString('pt-BR')}
+                        </div>
+                        <div style={{ fontSize:10, color:'#9ca3af', fontFamily:'monospace' }}>
+                          {tx.recibo ? tx.recibo.substring(0,12)+'...' : '—'}
+                        </div>
+                        {tx.erro_descricao && (
+                          <div style={{ fontSize:10, color:'#E24B4A', marginTop:2 }} title={tx.erro_descricao}>
+                            {tx.erro_descricao.substring(0,30)}...
+                          </div>
+                        )}
                       </div>
-                    ) : <span style={{ color:'#9ca3af', fontSize:12 }}>—</span>}
+                    ) : (
+                      <span style={{ color:'#9ca3af', fontSize:12 }}>—</span>
+                    )}
                   </td>
+
+                  {/* Status */}
                   <td style={s.td}>
-                    <div>
-                      <span style={{ padding:'3px 10px', borderRadius:99, fontSize:11, fontWeight:600, background:st.bg, color:st.cor }}>
-                        {st.label}
-                      </span>
-                      {st.motivo && <div style={{ fontSize:10, color:'#9ca3af', marginTop:3 }}>{st.motivo}</div>}
-                    </div>
+                    <span style={{ padding:'3px 10px', borderRadius:99, fontSize:11, fontWeight:600, background:st.bg, color:st.cor }}>
+                      {st.label}
+                    </span>
+                    {st.motivo && (
+                      <div style={{ fontSize:10, color:'#9ca3af', marginTop:3, maxWidth:160 }}>
+                        {st.motivo}
+                      </div>
+                    )}
                   </td>
+
+                  {/* Ações */}
                   <td style={s.td}>
                     <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                      {/* Ir para transmissão */}
                       {st.pode && (
                         <button style={{ ...s.btnAcao, color:'#185FA5', borderColor:'#B5D4F4' }}
                           onClick={() => router.push('/transmissao-manual')}>
                           Transmitir
                         </button>
                       )}
-                      <button style={s.btnAcao} onClick={() => router.push(`/leitor`)}>
-                        Novo ASO
+                      {/* Importar novo ASO */}
+                      <button style={s.btnAcao}
+                        onClick={() => router.push('/leitor')}>
+                        {aso ? 'Novo ASO' : 'Importar ASO'}
                       </button>
+                      {/* Completar dados */}
                       {st.label === 'Dados incompletos' && (
                         <button style={{ ...s.btnAcao, color:'#EF9F27', borderColor:'#FAC775' }}
                           onClick={() => router.push('/funcionarios')}>
@@ -210,6 +290,7 @@ export default function S2220() {
                       )}
                     </div>
                   </td>
+
                 </tr>
               )
             })}
