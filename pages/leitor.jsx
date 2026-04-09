@@ -353,7 +353,7 @@ export default function Leitor() {
               </div>
             )}
           </div>
-          <input ref={inputRef} type="file" {tipoFixo === "aso" ? ".pdf,.xml" : ".pdf"} style={{ display:'none' }}
+          <input ref={inputRef} type="file" accept={tipoFixo === "aso" ? ".pdf,.xml" : ".pdf"} style={{ display:'none' }}
             onChange={e => setArquivo(e.target.files[0])} />
 
           {arquivo && (
