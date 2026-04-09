@@ -95,11 +95,25 @@ export default function Funcionarios() {
 
   function cancelar() { setMostrarForm(false); setFuncEditando(null); setForm(formVazio()); setErro('') }
 
+  function validarCPF(cpf: string): boolean {
+    const n = cpf.replace(/\D/g, '')
+    if (n.length !== 11 || /^(\d)\1+$/.test(n)) return false
+    let s = 0
+    for (let i = 0; i < 9; i++) s += parseInt(n[i]) * (10 - i)
+    let r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+    if (r !== parseInt(n[9])) return false
+    s = 0
+    for (let i = 0; i < 10; i++) s += parseInt(n[i]) * (11 - i)
+    r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+    return r === parseInt(n[10])
+  }
+
   async function salvar(e) {
     e.preventDefault()
     setErro(''); setSucesso('')
     if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return }
     if (!form.cpf.trim()) { setErro('CPF é obrigatório.'); return }
+    if (!validarCPF(form.cpf)) { setErro('CPF inválido. Verifique os dígitos.'); return }
 
     const dados = {
       nome: form.nome.trim(),

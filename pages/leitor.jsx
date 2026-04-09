@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -26,7 +26,7 @@ export default function Leitor() {
   const [funcionarios, setFuncionarios] = useState([])
   const [funcMatch, setFuncMatch] = useState(null)
 
-  useState(() => {
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push('/'); return }
       supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()

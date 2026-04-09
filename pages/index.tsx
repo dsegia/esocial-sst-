@@ -135,12 +135,6 @@ export default function Login() {
             </button>
           </form>
 
-          <div style={s.dica}>
-            <strong>Credenciais de teste:</strong><br/>
-            E-mail: admin@esocial.com<br/>
-            Senha: Esocial@123
-          </div>
-
           <div style={s.rodape}>
             Não tem conta? Crie pelo Supabase → Authentication → Add user
           </div>
@@ -164,6 +158,5 @@ const s = {
   infoBox:  { background:'#E6F1FB', color:'#0C447C', border:'0.5px solid #B5D4F4', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:14 },
   erroBox:  { background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:14, lineHeight:1.5 },
   btnPrimary:{ width:'100%', padding:'11px', background:'#185FA5', color:'#fff', border:'none', borderRadius:8, fontSize:14, fontWeight:600, cursor:'pointer' },
-  dica:     { marginTop:16, padding:'10px 14px', background:'#f9fafb', borderRadius:8, fontSize:12, color:'#374151', lineHeight:1.8, border:'0.5px solid #e5e7eb' },
   rodape:   { marginTop:12, fontSize:11, color:'#9ca3af', textAlign:'center', lineHeight:1.6 },
 }
