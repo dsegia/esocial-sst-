@@ -11,6 +11,53 @@ const supabase = createClient(
 
 const formVazio = () => ({ nome:'', cpf:'', data_nasc:'', data_adm:'', matricula_esocial:'', funcao:'', setor:'', vinculo:'CLT', turno:'Diurno' })
 
+// Colunas do modelo de planilha
+const COLUNAS = ['nome','cpf','data_nasc','data_adm','matricula_esocial','funcao','setor','vinculo','turno']
+const COLUNAS_LABEL = ['Nome Completo *','CPF *','Data Nascimento (DD/MM/AAAA)','Data Admissão (DD/MM/AAAA)','Matrícula eSocial','Função/Cargo','Setor/GHE','Vínculo (CLT/PJ/Estatutário)','Turno (Diurno/Noturno/Misto)']
+
+function gerarModeloCSV() {
+  const header = COLUNAS_LABEL.join(';')
+  const exemplo = 'João Silva Santos;123.456.789-00;15/03/1990;01/06/2020;12345;Operador de Produção;Produção;CLT;Diurno'
+  const blob = new Blob(['\uFEFF' + header + '\n' + exemplo], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url
+  a.download = 'modelo_funcionarios_esocial.csv'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function parsarData(s) {
+  if (!s) return null
+  // DD/MM/AAAA → AAAA-MM-DD
+  if (s.includes('/')) {
+    const [d,m,a] = s.split('/')
+    if (a && m && d) return `${a.trim()}-${m.trim().padStart(2,'0')}-${d.trim().padStart(2,'0')}`
+  }
+  // AAAA-MM-DD já OK
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  return null
+}
+
+function gerarModeloCSV() {
+  const header = 'Nome Completo *;CPF *;Data Nascimento (DD/MM/AAAA);Data Admissão (DD/MM/AAAA);Matrícula eSocial;Função/Cargo;Setor/GHE;Vínculo (CLT/PJ/Estatutário);Turno (Diurno/Noturno/Misto)'
+  const ex1 = 'João Silva Santos;123.456.789-00;15/03/1990;01/06/2020;12345;Operador de Produção;Produção;CLT;Diurno'
+  const ex2 = 'Maria Souza Lima;987.654.321-00;22/07/1985;15/02/2019;;Auxiliar Administrativo;Administrativo;CLT;Diurno'
+  const blob = new Blob(['\uFEFF' + header + '\n' + ex1 + '\n' + ex2], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url
+  a.download = 'modelo_funcionarios_esocial.csv'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function parsarData(s) {
+  if (!s || !s.trim()) return null
+  if (s.includes('/')) {
+    const [d,m,a] = s.split('/')
+    if (a && m && d) return `${a.trim()}-${m.trim().padStart(2,'0')}-${d.trim().padStart(2,'0')}`
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return s.trim()
+  return null
+}
+
 export default function Funcionarios() {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState('')
@@ -22,6 +69,12 @@ export default function Funcionarios() {
   const [form, setForm] = useState(formVazio())
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState('')
+  // Importar planilha
+  const [importando, setImportando] = useState(false)
+  const [previewImport, setPreviewImport] = useState([])
+  const [errosImport, setErrosImport] = useState([])
+  const [mostrarImport, setMostrarImport] = useState(false)
+  const [salvandoImport, setSalvandoImport] = useState(false)
 
   useEffect(() => { init() }, [])
 
@@ -104,6 +157,84 @@ export default function Funcionarios() {
     carregar(empresaId, busca)
   }
 
+  function lerPlanilha(file) {
+    setImportando(true); setErrosImport([]); setPreviewImport([])
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const texto = e.target.result
+      const linhas = texto.split(/\r?\n/).filter(l => l.trim())
+      if (linhas.length < 2) { setErrosImport(['Arquivo vazio ou sem dados.']); setImportando(false); return }
+      const sep = linhas[0].includes(';') ? ';' : ','
+      const header = linhas[0].split(sep).map(h => h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'_'))
+      const idx = (termos) => { for (const t of termos) { const i = header.findIndex(h => h.includes(t)); if (i >= 0) return i } return -1 }
+      const idxNome  = idx(['nome'])
+      const idxCPF   = idx(['cpf'])
+      const idxNasc  = idx(['nasc'])
+      const idxAdm   = idx(['adm'])
+      const idxMat   = idx(['matricula'])
+      const idxFunc  = idx(['funcao','cargo'])
+      const idxSetor = idx(['setor','ghe'])
+      const idxVinc  = idx(['vinculo'])
+      const idxTurno = idx(['turno'])
+      if (idxNome < 0 || idxCPF < 0) { setErrosImport(['Colunas Nome e CPF são obrigatórias.']); setImportando(false); return }
+      const erros = []
+      const funcionarios = []
+      linhas.slice(1).forEach((linha, i) => {
+        if (!linha.trim()) return
+        const cols = linha.split(sep).map(c => c.trim().replace(/^"|"$/g,''))
+        const nome = idxNome >= 0 ? cols[idxNome] : ''
+        const cpf  = idxCPF  >= 0 ? cols[idxCPF]  : ''
+        if (!nome) { erros.push(`Linha ${i+2}: nome vazio`); return }
+        if (!cpf)  { erros.push(`Linha ${i+2}: CPF vazio`);  return }
+        funcionarios.push({
+          nome, cpf: cpf.replace(/\D/g,'').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+          data_nasc: parsarData(idxNasc  >= 0 ? cols[idxNasc]  : ''),
+          data_adm:  parsarData(idxAdm   >= 0 ? cols[idxAdm]   : ''),
+          matricula_esocial: idxMat >= 0 ? cols[idxMat] || null : null,
+          funcao: idxFunc  >= 0 ? cols[idxFunc]  || null : null,
+          setor:  idxSetor >= 0 ? cols[idxSetor] || null : null,
+          vinculo: idxVinc >= 0 ? cols[idxVinc]  || 'CLT' : 'CLT',
+          turno:   idxTurno >= 0 ? cols[idxTurno] || 'Diurno' : 'Diurno',
+        })
+      })
+      setErrosImport(erros)
+      setPreviewImport(funcionarios)
+      setMostrarImport(true)
+      setImportando(false)
+    }
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  async function confirmarImport() {
+    if (!previewImport.length) return
+    setSalvandoImport(true); setErro(''); setSucesso('')
+    let ok = 0; let fail = 0
+    for (const func of previewImport) {
+      const cpfLimpo = func.cpf.replace(/\D/g,'')
+      const { data: existe } = await supabase.from('funcionarios').select('id').eq('empresa_id', empresaId).eq('cpf', func.cpf).single()
+      if (existe) {
+        const { error } = await supabase.from('funcionarios').update({
+          nome: func.nome, data_nasc: func.data_nasc, data_adm: func.data_adm,
+          matricula_esocial: func.matricula_esocial || ('AUTO-' + cpfLimpo.slice(-6)),
+          funcao: func.funcao, setor: func.setor, vinculo: func.vinculo, turno: func.turno,
+        }).eq('id', existe.id)
+        error ? fail++ : ok++
+      } else {
+        const { error } = await supabase.from('funcionarios').insert({
+          empresa_id: empresaId, ativo: true,
+          nome: func.nome, cpf: func.cpf,
+          data_nasc: func.data_nasc, data_adm: func.data_adm,
+          matricula_esocial: func.matricula_esocial || ('AUTO-' + cpfLimpo.slice(-6)),
+          funcao: func.funcao, setor: func.setor, vinculo: func.vinculo, turno: func.turno,
+        })
+        error ? fail++ : ok++
+      }
+    }
+    setSucesso(`${ok} funcionário(s) importado(s).${fail > 0 ? ` ${fail} com erro.` : ''}`)
+    setMostrarImport(false); setPreviewImport([]); setSalvandoImport(false)
+    carregar(empresaId, busca)
+  }
+
   function fmtCPF(v) {
     return v.replace(/\D/g,'').substring(0,11)
       .replace(/(\d{3})(\d)/,'$1.$2')
@@ -129,6 +260,12 @@ export default function Funcionarios() {
         <div style={{ display:'flex', gap:8 }}>
           <input style={s.busca} placeholder="Buscar nome, CPF ou matrícula..."
             value={busca} onChange={e => { setBusca(e.target.value); carregar(empresaId, e.target.value) }} />
+          <button style={s.btnOutline} onClick={gerarModeloCSV}>⬇ Baixar modelo</button>
+          <label style={{ ...s.btnOutline, cursor:'pointer', display:'inline-flex', alignItems:'center' }}>
+            ↑ Importar planilha
+            <input type="file" accept=".csv,.xlsx" style={{ display:'none' }}
+              onChange={e => e.target.files[0] && lerPlanilha(e.target.files[0])} />
+          </label>
           <button style={s.btnPrimary} onClick={abrirNovo}>+ Adicionar</button>
         </div>
       </div>
@@ -254,6 +391,72 @@ export default function Funcionarios() {
           </tbody>
         </table>
       </div>
+      {/* Modal importar planilha */}
+      {mostrarImport && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}
+          onClick={() => setMostrarImport(false)}>
+          <div style={{ background:'var(--color-background-primary,#fff)', borderRadius:14, padding:'1.5rem', width:640, maxHeight:'85vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontSize:15, fontWeight:600, color:'#111' }}>
+                ↑ Importar planilha — {previewImport.length} funcionário(s)
+              </div>
+              <button onClick={() => setMostrarImport(false)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
+            </div>
+
+            {errosImport.length > 0 && (
+              <div style={{ background:'#FCEBEB', border:'0.5px solid #F09595', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#791F1F', marginBottom:12 }}>
+                <strong>{errosImport.length} aviso(s):</strong>
+                {errosImport.slice(0,5).map((e,i) => <div key={i}>• {e}</div>)}
+                {errosImport.length > 5 && <div>+{errosImport.length-5} mais...</div>}
+              </div>
+            )}
+
+            {previewImport.length > 0 && (
+              <div style={{ background:'#EAF3DE', border:'0.5px solid #C0DD97', borderRadius:8, padding:'8px 14px', fontSize:12, color:'#27500A', marginBottom:12 }}>
+                ✓ {previewImport.length} funcionário(s) prontos para importar. Existentes serão atualizados, novos serão criados.
+              </div>
+            )}
+
+            <div style={{ border:'0.5px solid #e5e7eb', borderRadius:8, overflow:'hidden', marginBottom:14 }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                <thead>
+                  <tr style={{ background:'#f9fafb' }}>
+                    {['Nome','CPF','Nascimento','Admissão','Matrícula','Função/Cargo','Setor'].map(h => (
+                      <th key={h} style={{ padding:'7px 10px', textAlign:'left', fontSize:10, fontWeight:600, color:'#9ca3af', borderBottom:'0.5px solid #e5e7eb', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewImport.slice(0,10).map((f,i) => (
+                    <tr key={i} style={{ borderBottom:'0.5px solid #f3f4f6' }}>
+                      <td style={{ padding:'7px 10px', fontWeight:500 }}>{f.nome}</td>
+                      <td style={{ padding:'7px 10px', color:'#6b7280' }}>{f.cpf}</td>
+                      <td style={{ padding:'7px 10px', color:'#6b7280' }}>{f.data_nasc||'—'}</td>
+                      <td style={{ padding:'7px 10px', color:'#6b7280' }}>{f.data_adm||'—'}</td>
+                      <td style={{ padding:'7px 10px', color:'#6b7280', fontFamily:'monospace', fontSize:11 }}>{f.matricula_esocial||'—'}</td>
+                      <td style={{ padding:'7px 10px', color:'#374151' }}>{f.funcao||'—'}</td>
+                      <td style={{ padding:'7px 10px', color:'#374151' }}>{f.setor||'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {previewImport.length > 10 && (
+                <div style={{ padding:'8px 12px', fontSize:11, color:'#9ca3af', background:'#f9fafb', textAlign:'center' }}>
+                  +{previewImport.length-10} funcionário(s) não exibidos
+                </div>
+              )}
+            </div>
+
+            <div style={{ display:'flex', gap:8 }}>
+              <button style={s.btnPrimary} onClick={confirmarImport} disabled={salvandoImport || !previewImport.length}>
+                {salvandoImport ? 'Importando...' : `Confirmar importação (${previewImport.length})`}
+              </button>
+              <button style={s.btnOutline} onClick={() => setMostrarImport(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }
