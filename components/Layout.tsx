@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router'
 import { createClient } from '@supabase/supabase-js'
-import { useEffect, useRef, useState } from 'react'
-import { getEmpresaId, setEmpresaId, isMultiEmpresa, limparEmpresa } from '../lib/empresa'
+import { useEffect, useState } from 'react'
+import { getEmpresaId, isMultiEmpresa, limparEmpresa } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,18 +25,12 @@ const MENU = [
   { href:'/configuracoes',   label:'Configurações',           icon:'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z' },
 ]
 
-type Empresa = { id: string; razao_social: string; cnpj: string; perfil?: string }
-
 export default function Layout({ children, pagina }) {
   const router = useRouter()
   const [nomeEmpresa, setNomeEmpresa] = useState('')
-  const [empresaAtualId, setEmpresaAtualId] = useState('')
   const [nomeUser, setNomeUser] = useState('')
   const [semCert, setSemCert] = useState(false)
   const [multi, setMulti] = useState(false)
-  const [empresas, setEmpresas] = useState<Empresa[]>([])
-  const [dropdownAberto, setDropdownAberto] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMulti(isMultiEmpresa())
@@ -47,44 +41,19 @@ export default function Layout({ children, pagina }) {
           if (!usuario) return
           setNomeUser(usuario.nome)
           const eId = getEmpresaId() || usuario.empresa_id
-          setEmpresaAtualId(eId)
           supabase.from('empresas').select('razao_social, cert_digital_validade')
             .eq('id', eId).single()
             .then(({ data: emp }) => {
               if (emp) { setNomeEmpresa(emp.razao_social || ''); setSemCert(!emp.cert_digital_validade) }
             })
-          // Carrega lista completa se multi-empresa
-          if (isMultiEmpresa()) {
-            supabase.rpc('get_minhas_empresas').then(({ data }) => {
-              if (data) setEmpresas(data)
-            })
-          }
         })
     })
   }, [])
 
-  // Fecha dropdown ao clicar fora
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownAberto(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
   async function sair() { limparEmpresa(); await supabase.auth.signOut(); router.push('/') }
 
-  function trocarParaEmpresa(emp: Empresa) {
-    setEmpresaId(emp.id)
-    setDropdownAberto(false)
-    // Recarrega a página atual com a nova empresa
-    router.reload()
-  }
-
   function initials(nome: string) {
-    return nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+    return nome.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase()
   }
 
   return (
@@ -105,87 +74,32 @@ export default function Layout({ children, pagina }) {
           </div>
         </div>
 
-        {/* Seletor de empresa */}
-        <div ref={dropdownRef} style={{ position:'relative', padding:'0 .75rem', marginBottom:'.75rem' }}>
-          <button
-            onClick={() => multi && setDropdownAberto(v => !v)}
+        {/* Empresa atual — clique abre /empresas */}
+        <div style={{ padding:'0 .75rem', marginBottom:'.75rem' }}>
+          <button onClick={() => router.push('/empresas')}
             style={{
               width:'100%', display:'flex', alignItems:'center', gap:8,
               padding:'8px 10px', borderRadius:8, border:'0.5px solid #e5e7eb',
-              background: dropdownAberto ? '#f5f9ff' : '#f9fafb',
-              cursor: multi ? 'pointer' : 'default', textAlign:'left',
-            }}
-          >
+              background: pagina === 'empresas' ? '#E6F1FB' : '#f9fafb',
+              cursor:'pointer', textAlign:'left',
+            }}>
             <div style={{ width:28, height:28, borderRadius:6, background:'#185FA5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
               <span style={{ fontSize:9, fontWeight:700, color:'#fff', lineHeight:1 }}>
                 {initials(nomeEmpresa || 'E')}
               </span>
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:11, fontWeight:600, color:'#111', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              <div style={{ fontSize:11, fontWeight:600, color: pagina === 'empresas' ? '#185FA5' : '#111', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {nomeEmpresa || 'Carregando...'}
               </div>
-              {multi && (
-                <div style={{ fontSize:10, color:'#9ca3af', marginTop:1 }}>Clique para trocar</div>
-              )}
+              <div style={{ fontSize:10, color:'#9ca3af', marginTop:1 }}>
+                {multi ? 'Gerenciar empresas' : 'Ver empresa'}
+              </div>
             </div>
-            {multi && (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" style={{ flexShrink:0, transform: dropdownAberto ? 'rotate(180deg)' : 'none', transition:'transform .15s' }}>
-                <polyline points="6,9 12,15 18,9"/>
-              </svg>
-            )}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" style={{ flexShrink:0 }}>
+              <polyline points="9,18 15,12 9,6"/>
+            </svg>
           </button>
-
-          {/* Dropdown com lista de empresas */}
-          {dropdownAberto && empresas.length > 0 && (
-            <div style={{
-              position:'absolute', top:'calc(100% + 4px)', left:'.75rem', right:'.75rem',
-              background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:10,
-              boxShadow:'0 8px 24px rgba(0,0,0,0.12)', zIndex:100, overflow:'hidden',
-            }}>
-              <div style={{ padding:'8px 12px 6px', fontSize:10, fontWeight:600, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'.06em' }}>
-                Suas empresas
-              </div>
-              {empresas.map((emp) => {
-                const ativa = emp.id === empresaAtualId
-                return (
-                  <button key={emp.id} onClick={() => trocarParaEmpresa(emp)}
-                    style={{
-                      width:'100%', display:'flex', alignItems:'center', gap:8,
-                      padding:'8px 12px', border:'none', textAlign:'left', cursor:'pointer',
-                      background: ativa ? '#E6F1FB' : 'transparent',
-                    }}
-                    onMouseEnter={e => { if (!ativa) (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-                    onMouseLeave={e => { if (!ativa) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-                  >
-                    <div style={{ width:24, height:24, borderRadius:5, background: ativa ? '#185FA5' : '#e5e7eb', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span style={{ fontSize:8, fontWeight:700, color: ativa ? '#fff' : '#6b7280' }}>
-                        {initials(emp.razao_social)}
-                      </span>
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:11, fontWeight: ativa ? 600 : 400, color: ativa ? '#185FA5' : '#374151', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {emp.razao_social}
-                      </div>
-                      {emp.perfil && (
-                        <div style={{ fontSize:9, color:'#9ca3af', marginTop:1, textTransform:'capitalize' }}>{emp.perfil}</div>
-                      )}
-                    </div>
-                    {ativa && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2.5">
-                        <polyline points="20,6 9,17 4,12"/>
-                      </svg>
-                    )}
-                  </button>
-                )
-              })}
-              <div style={{ borderTop:'0.5px solid #f3f4f6', padding:'6px 12px 8px' }}>
-                <button onClick={sair} style={{ background:'none', border:'none', fontSize:11, color:'#9ca3af', cursor:'pointer', padding:0 }}>
-                  Sair da conta
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Menu de navegação */}
