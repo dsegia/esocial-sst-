@@ -10,10 +10,10 @@ const supabase = createClient(
 const MENU = [
   { href:'/dashboard',      label:'Dashboard',              icon:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
   { href:'/funcionarios',   label:'Funcionários',            icon:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z' },
-  { href:'/leitor',         label:'Leitor PDF/XML',          icon:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12' },
   { sep:true, label:'DOCUMENTOS SST' },
-  { href:'/ltcat',          label:'LTCAT',                   icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
-  { href:'/pcmso',          label:'PCMSO',                   icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
+  { href:'/leitor?tipo=aso', label:'ASO',                   icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+  { href:'/ltcat',           label:'LTCAT',                 icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
+  { href:'/pcmso',           label:'PCMSO',                 icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
   { sep:true, label:'TRANSMISSÕES' },
   { href:'/s2220',          label:'S-2220 Monit. Saúde',     icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
   { href:'/s2240',          label:'S-2240 Cond. Ambientais', icon:'M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2zM14 3v5h5' },
@@ -71,7 +71,7 @@ export default function Layout({ children, pagina }) {
                 {item.label}
               </div>
             )
-            const ativo = pagina === item.href.replace('/','')
+            const ativo = pagina === item.href.replace('/','').split('?')[0]
             const isCfg = item.href === '/configuracoes'
             return (
               <a key={item.href} href={item.href} style={{
