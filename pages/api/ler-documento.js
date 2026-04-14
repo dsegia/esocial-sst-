@@ -117,9 +117,27 @@ EXTRAIA:
   "confianca":{"medico":90,"programas":85}
 }`
 
+const PROMPT_AUTO = `Você é especialista em documentos SST brasileiros. Analise este PDF e:
+1. Identifique o tipo do documento: "ltcat", "pcmso" ou "aso"
+   - LTCAT = Laudo Técnico das Condições Ambientais do Trabalho
+   - PCMSO = Programa de Controle Médico de Saúde Ocupacional
+   - ASO = Atestado de Saúde Ocupacional
+2. Extraia os dados conforme o tipo identificado
+
+Se for LTCAT, retorne:
+{"tipo":"ltcat","dados_gerais":{"data_emissao":null,"data_vigencia":null,"prox_revisao":null,"resp_nome":null,"resp_conselho":"CREA","resp_registro":null},"ghes":[{"nome":"GHE 01","setor":null,"qtd_trabalhadores":1,"aposentadoria_especial":false,"funcoes":["Cargo 1"],"agentes":[{"tipo":"fis","nome":"Ruído contínuo","valor":null,"limite":null,"supera_lt":false,"codigo_t24":"01.01.001"}],"epc":[],"epi":[]}],"confianca":{"data_emissao":90,"resp_nome":90,"ghes":90}}
+
+Se for PCMSO, retorne:
+{"tipo":"pcmso","dados_gerais":{"medico_nome":null,"medico_crm":null,"data_elaboracao":null,"vigencia":null},"programas":[{"funcao":"Nome da função","setor":null,"riscos":[],"exames":[{"nome":"Audiometria","periodicidade":"Anual","obrigatorio":true}]}],"confianca":{"medico":90,"programas":85}}
+
+Se for ASO, retorne:
+{"tipo":"aso","funcionario":{"nome":null,"cpf":null,"data_nasc":null,"data_adm":null,"matricula":null,"funcao":null,"setor":null},"aso":{"tipo_aso":"periodico","data_exame":null,"prox_exame":null,"conclusao":"apto","medico_nome":null,"medico_crm":null},"exames":[{"nome":"nome do exame","resultado":"Normal"}],"riscos":["risco 1"],"confianca":{"nome":85,"cpf":85,"tipo_aso":80,"data_exame":90,"conclusao":85}}
+
+Retorne SOMENTE o JSON, nada antes ou depois.`
+
 // ── Leitor Claude com PDF nativo (primário para LTCAT/PCMSO) ─
 async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) {
-  const prompt = tipo === 'pcmso' ? PROMPT_PCMSO : PROMPT_LTCAT
+  const prompt = tipo === 'pcmso' ? PROMPT_PCMSO : tipo === 'auto' ? PROMPT_AUTO : PROMPT_LTCAT
 
   function extrairJSON(str) {
     const ini = str.indexOf('{'); if (ini===-1) return null
@@ -182,6 +200,11 @@ async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) 
     const resultado = parseRobusto(texto)
     if (resultado) {
       const modo = pdf_base64 ? 'pdf-nativo' : paginas?.length > 0 ? 'imagem' : 'texto'
+      if (tipo === 'auto' && resultado.tipo) {
+        const tipoDetectado = resultado.tipo
+        const { tipo: _, ...dadosSemTipo } = resultado
+        return { tipo_detectado: tipoDetectado, dados: enriquecer(dadosSemTipo, tipoDetectado), modo, modelo: 'claude-sonnet' }
+      }
       return { dados: enriquecer(resultado, tipo), modo, modelo: 'claude-sonnet' }
     }
     throw new Error('JSON inválido na resposta do Claude')
@@ -201,13 +224,14 @@ export default async function handler(req, res) {
 
   if (!geminiKey && !anthropicKey) return res.status(500).json({ erro: 'Nenhuma API key configurada' })
 
-  // LTCAT e PCMSO: Claude com PDF nativo (preferencial) → Gemini fallback
+  // AUTO/LTCAT/PCMSO: Claude com PDF nativo (preferencial) → Gemini fallback
   // ASO: Gemini primário → Claude fallback
-  if ((tipo === 'ltcat' || tipo === 'pcmso') && anthropicKey) {
+  if ((tipo === 'auto' || tipo === 'ltcat' || tipo === 'pcmso') && anthropicKey) {
     const claudeResult = await lerComClaude(pdf_base64 || null, texto_pdf, paginas, tipo, anthropicKey)
     if (claudeResult) {
       return res.status(200).json({ sucesso: true, ...claudeResult })
     }
+    if (tipo === 'auto') return res.status(500).json({ erro: 'Não foi possível identificar o documento. Verifique se é um ASO, LTCAT ou PCMSO válido.' })
     console.log(`Gemini como fallback para ${tipo.toUpperCase()}`)
   }
 
