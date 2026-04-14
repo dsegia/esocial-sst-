@@ -80,60 +80,93 @@ function codigoAgente(nome) {
 }
 
 // ── Prompts ──────────────────────────────────────────────
-const PROMPT_LTCAT = `Você é especialista em LTCAT brasileiro. Analise o documento completo e retorne SOMENTE JSON válido.
+const PROMPT_LTCAT = `Você é especialista em LTCAT brasileiro. Analise o documento COMPLETO e retorne SOMENTE JSON válido, sem texto antes ou depois.
 
-REGRAS:
-- "funcoes": extraia CADA cargo/função individualmente como item separado do array (podem ser dezenas)
-- "agentes": cada risco separado; tipo: fis=físico, qui=químico, bio=biológico, erg=ergonômico
-- "aposentadoria_especial": true se houver indicação de atividade/adicional especial
-- Datas no formato AAAA-MM-DD
+ESTRUTURA TÍPICA DO DOCUMENTO:
+- "Data de criação" ou "Data de Emissão" → data_emissao
+- "RESPONSABILIDADE TÉCNICA" → resp_nome, resp_conselho (CREA ou CRM), resp_registro (número)
+- Tabelas "CÓD. GHE/GF" + "NOMENCLATURA GHE/GF" → cada linha é um GHE separado
+- Coluna "FUNÇÃO" dentro de cada GHE → extraia CADA função/cargo individualmente
+- Tabela de RISCO com "Código eSocial" → agentes do GHE
+- Se risco mostrar "Ausência de agente nocivo" ou "Inexiste" → agentes = [] e aposentadoria_especial = false
+- Tabela EPI / EPC no final de cada GHE → extraia equipamentos (ignora "--")
+
+REGRAS CRÍTICAS:
+1. Datas: converter DD/MM/AAAA para AAAA-MM-DD. Ex: "08/02/2022" → "2022-02-08"
+2. "funcoes": CADA cargo separado no array. Se GHE tem 5 funções, o array deve ter 5 itens
+3. "agentes": array vazio [] se o documento diz "Inexiste", "Ausência" ou similar
+4. "aposentadoria_especial": true APENAS se o laudo confirma direito a aposentadoria especial
+5. "epi": array vazio [] se todos os EPIs são "--". Mesmo para epc
+6. "resp_conselho": "CREA" se engenheiro, "CRM" se médico do trabalho
 
 {
-  "dados_gerais": {"data_emissao":null,"data_vigencia":null,"prox_revisao":null,"resp_nome":null,"resp_conselho":"CREA","resp_registro":null},
-  "ghes": [{
-    "nome":"GHE 01","setor":null,"qtd_trabalhadores":1,"aposentadoria_especial":false,
-    "funcoes":["Cargo 1","Cargo 2"],
-    "agentes":[{"tipo":"fis","nome":"Ruído contínuo","valor":null,"limite":null,"supera_lt":false,"codigo_t24":"01.01.001"}],
-    "epc":[{"nome":"nome","eficaz":true}],
-    "epi":[{"nome":"nome","ca":"12345","eficaz":true}]
-  }],
-  "confianca":{"data_emissao":90,"resp_nome":90,"ghes":90}
+  "dados_gerais": {
+    "data_emissao": "2022-02-08",
+    "data_vigencia": null,
+    "prox_revisao": null,
+    "resp_nome": "Nome Completo do Responsável",
+    "resp_conselho": "CREA",
+    "resp_registro": "1512311472"
+  },
+  "ghes": [
+    {
+      "nome": "GHE 01 - ADMINISTRAÇÃO",
+      "setor": "Administrativo",
+      "qtd_trabalhadores": 5,
+      "aposentadoria_especial": false,
+      "funcoes": ["Auxiliar de vendas", "Gerente de Vendas", "Estoquista"],
+      "agentes": [],
+      "epc": [{"nome": "Extintor pó químico ABC", "eficaz": true}],
+      "epi": []
+    }
+  ],
+  "confianca": {"data_emissao": 95, "resp_nome": 95, "ghes": 90}
 }`
 
-const PROMPT_PCMSO = `Você é especialista em PCMSO brasileiro (NR-7). Analise o documento completo e retorne SOMENTE JSON válido.
+const PROMPT_PCMSO = `Você é especialista em PCMSO brasileiro (NR-7). Analise o documento COMPLETO e retorne SOMENTE JSON válido.
 
 EXTRAIA:
-1. dados_gerais: médico responsável, CRM, data de elaboração, vigência
-2. Para cada função/cargo, os exames obrigatórios com periodicidade
+1. dados_gerais: médico coordenador (nome + CRM), data de elaboração, período de vigência
+2. Para CADA função/cargo listada no programa, os exames com periodicidade
+
+REGRAS:
+- Datas: converter DD/MM/AAAA para AAAA-MM-DD
+- Para cada função, liste TODOS os exames previstos (admissional, periódico, etc.)
+- Periodicidade típica: "Anual", "Semestral", "Bienal", "A cada exame"
 
 {
-  "dados_gerais":{"medico_nome":null,"medico_crm":null,"data_elaboracao":null,"vigencia":null},
-  "programas":[{
-    "funcao":"Nome da função",
-    "setor":null,
-    "riscos":["Risco 1","Risco 2"],
-    "exames":[{"nome":"Audiometria","periodicidade":"Anual","obrigatorio":true}]
-  }],
-  "confianca":{"medico":90,"programas":85}
+  "dados_gerais": {"medico_nome": null, "medico_crm": null, "data_elaboracao": null, "vigencia": null},
+  "programas": [
+    {
+      "funcao": "Nome da função",
+      "setor": null,
+      "riscos": ["Risco 1"],
+      "exames": [{"nome": "Avaliação clínica", "periodicidade": "Anual", "obrigatorio": true}]
+    }
+  ],
+  "confianca": {"medico": 90, "programas": 85}
 }`
 
-const PROMPT_AUTO = `Você é especialista em documentos SST brasileiros. Analise este PDF e:
-1. Identifique o tipo do documento: "ltcat", "pcmso" ou "aso"
-   - LTCAT = Laudo Técnico das Condições Ambientais do Trabalho
-   - PCMSO = Programa de Controle Médico de Saúde Ocupacional
-   - ASO = Atestado de Saúde Ocupacional
-2. Extraia os dados conforme o tipo identificado
+const PROMPT_AUTO = `Você é especialista em documentos SST brasileiros. Analise COMPLETAMENTE este PDF e:
 
-Se for LTCAT, retorne:
-{"tipo":"ltcat","dados_gerais":{"data_emissao":null,"data_vigencia":null,"prox_revisao":null,"resp_nome":null,"resp_conselho":"CREA","resp_registro":null},"ghes":[{"nome":"GHE 01","setor":null,"qtd_trabalhadores":1,"aposentadoria_especial":false,"funcoes":["Cargo 1"],"agentes":[{"tipo":"fis","nome":"Ruído contínuo","valor":null,"limite":null,"supera_lt":false,"codigo_t24":"01.01.001"}],"epc":[],"epi":[]}],"confianca":{"data_emissao":90,"resp_nome":90,"ghes":90}}
+PASSO 1 — Identifique o tipo:
+- "ltcat" → contém "LTCAT", "Laudo Técnico das Condições Ambientais", GHEs, agentes de risco, responsável técnico CREA/CRM
+- "pcmso" → contém "PCMSO", "Programa de Controle Médico", exames ocupacionais por função, médico coordenador
+- "aso" → contém "ASO", "Atestado de Saúde Ocupacional", dados de UM funcionário específico, conclusão apto/inapto
 
-Se for PCMSO, retorne:
-{"tipo":"pcmso","dados_gerais":{"medico_nome":null,"medico_crm":null,"data_elaboracao":null,"vigencia":null},"programas":[{"funcao":"Nome da função","setor":null,"riscos":[],"exames":[{"nome":"Audiometria","periodicidade":"Anual","obrigatorio":true}]}],"confianca":{"medico":90,"programas":85}}
+PASSO 2 — Extraia os dados completos conforme o tipo:
 
-Se for ASO, retorne:
-{"tipo":"aso","funcionario":{"nome":null,"cpf":null,"data_nasc":null,"data_adm":null,"matricula":null,"funcao":null,"setor":null},"aso":{"tipo_aso":"periodico","data_exame":null,"prox_exame":null,"conclusao":"apto","medico_nome":null,"medico_crm":null},"exames":[{"nome":"nome do exame","resultado":"Normal"}],"riscos":["risco 1"],"confianca":{"nome":85,"cpf":85,"tipo_aso":80,"data_exame":90,"conclusao":85}}
+LTCAT → {"tipo":"ltcat","dados_gerais":{"data_emissao":"AAAA-MM-DD","data_vigencia":null,"prox_revisao":null,"resp_nome":"Nome do engenheiro/médico","resp_conselho":"CREA","resp_registro":"número do CREA/CRM"},"ghes":[{"nome":"GHE 01 - NOME","setor":"nome do setor","qtd_trabalhadores":1,"aposentadoria_especial":false,"funcoes":["Cargo 1","Cargo 2","Cargo 3"],"agentes":[{"tipo":"fis","nome":"Ruído contínuo","valor":null,"limite":null,"supera_lt":false}],"epc":[{"nome":"Extintor","eficaz":true}],"epi":[]}],"confianca":{"data_emissao":95,"resp_nome":95,"ghes":90}}
 
-Retorne SOMENTE o JSON, nada antes ou depois.`
+PCMSO → {"tipo":"pcmso","dados_gerais":{"medico_nome":null,"medico_crm":null,"data_elaboracao":null,"vigencia":null},"programas":[{"funcao":"Nome cargo","setor":null,"riscos":[],"exames":[{"nome":"Avaliação clínica","periodicidade":"Anual","obrigatorio":true}]}],"confianca":{"medico":90,"programas":85}}
+
+ASO → {"tipo":"aso","funcionario":{"nome":null,"cpf":null,"data_nasc":null,"data_adm":null,"matricula":null,"funcao":null,"setor":null},"aso":{"tipo_aso":"periodico","data_exame":null,"prox_exame":null,"conclusao":"apto","medico_nome":null,"medico_crm":null},"exames":[{"nome":"exame","resultado":"Normal"}],"riscos":["risco"],"confianca":{"nome":85,"cpf":85,"tipo_aso":80,"data_exame":90,"conclusao":85}}
+
+REGRAS GERAIS:
+- Datas: converter DD/MM/AAAA → AAAA-MM-DD
+- Agentes "Inexiste"/"Ausência de agente nocivo" → agentes = []
+- EPI "--" → epi = []
+- Retorne SOMENTE o JSON, sem texto antes ou depois`
 
 // ── Leitor Claude com PDF nativo (primário para LTCAT/PCMSO) ─
 async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) {
@@ -230,11 +263,8 @@ export default async function handler(req, res) {
   // ASO: Gemini primário → Claude fallback
   if ((tipo === 'auto' || tipo === 'ltcat' || tipo === 'pcmso') && anthropicKey) {
     const claudeResult = await lerComClaude(pdf_base64 || null, texto_pdf, paginas, tipo, anthropicKey)
-    if (claudeResult) {
-      return res.status(200).json({ sucesso: true, ...claudeResult })
-    }
-    if (tipo === 'auto') return res.status(500).json({ erro: 'Não foi possível identificar o documento. Verifique se é um ASO, LTCAT ou PCMSO válido.' })
-    console.log(`Gemini como fallback para ${tipo.toUpperCase()}`)
+    if (claudeResult) return res.status(200).json({ sucesso: true, ...claudeResult })
+    console.log(`Claude falhou para ${tipo.toUpperCase()}, tentando Gemini como fallback`)
   }
 
   const prompt_aso = `Você é um extrator de dados de ASO brasileiro. Analise o documento e retorne SOMENTE o JSON abaixo preenchido. Não escreva nada antes ou depois do JSON. Campos não encontrados devem ser null.
@@ -280,7 +310,7 @@ REGRAS CRÍTICAS:
   "confianca":{"data_emissao":90,"resp_nome":90,"ghes":85}
 }`
 
-  const promptBase = tipo === 'ltcat' ? prompt_ltcat : prompt_aso
+  const promptBase = tipo === 'ltcat' ? prompt_ltcat : tipo === 'auto' ? PROMPT_AUTO : tipo === 'pcmso' ? PROMPT_PCMSO : prompt_aso
   const usandoTexto = texto_pdf && texto_pdf.replace(/\s/g,'').length > 100
 
   function extrairJSON(str) {
@@ -344,20 +374,24 @@ REGRAS CRÍTICAS:
       : ['gemini-2.5-flash','gemini-2.5-flash-lite']
 
     let parts = []
-    if (usandoTexto) {
+    if (pdf_base64 && (tipo === 'auto' || tipo === 'pcmso')) {
+      // Gemini também suporta PDF inline para detecção automática e PCMSO
+      parts = [
+        { inlineData: { mimeType: 'application/pdf', data: pdf_base64 } },
+        { text: promptBase }
+      ]
+    } else if (usandoTexto) {
       // Pré-processar: extrair seções de FUNÇÕES DO GRUPO do texto bruto
       let textoProcessado = texto_pdf
-      if (tipo === 'ltcat') {
-        // Encontrar padrões "FUNÇÕES DO GRUPO: ..." e formatar para facilitar extração
+      if (tipo === 'ltcat' || tipo === 'auto') {
         textoProcessado = texto_pdf
           .replace(/FUNÇÕES DO GRUPO:/gi, '\n\n===FUNÇÕES DO GRUPO===\n')
           .replace(/CARGOS DO GRUPO:/gi, '\n\n===FUNÇÕES DO GRUPO===\n')
-          .replace(/CARGOS:/gi, '\n\n===FUNÇÕES DO GRUPO===\n')
           .replace(/FUNÇÃO DO GRUPO:/gi, '\n\n===FUNÇÕES DO GRUPO===\n')
-          .replace(/DESCRIÇÃO DAS ATIVIDADES/gi, '\n\n===FIM FUNÇÕES===\n')
-          .replace(/HORARIO E JORNADA/gi, '\n\n===FIM FUNÇÕES===\n')
+          .replace(/NOMENCLATURA GHE\/GF/gi, '\n\n===GHE===\n')
+          .replace(/DESCRIÇÃO DAS ATIVIDADES/gi, '\n\n===ATIVIDADES===\n')
       }
-      parts = [{ text: `${promptBase}\n\nTEXTO DO DOCUMENTO:\n${textoProcessado.substring(0,15000)}` }]
+      parts = [{ text: `${promptBase}\n\nTEXTO DO DOCUMENTO:\n${textoProcessado.substring(0,20000)}` }]
     } else if (paginas?.length > 0) {
       parts = [
         ...paginas.map(b64 => ({ inlineData: { mimeType:'image/jpeg', data:b64 } })),
@@ -384,6 +418,11 @@ REGRAS CRÍTICAS:
         const texto = (data.candidates?.[0]?.content?.parts||[]).filter(p=>p.text).map(p=>p.text).join('')
         const resultado = parseRobusto(texto)
         if (resultado) {
+          if (tipo === 'auto' && resultado.tipo) {
+            const tipoDetectado = resultado.tipo
+            const { tipo: _, ...dadosSemTipo } = resultado
+            return res.status(200).json({ sucesso:true, tipo_detectado: tipoDetectado, dados: enriquecer(dadosSemTipo, tipoDetectado), modo: usandoTexto?'texto':'imagem', modelo })
+          }
           return res.status(200).json({ sucesso:true, dados: enriquecer(resultado, tipo), modo: usandoTexto?'texto':'imagem', modelo })
         }
       } catch (err) { console.log(`Erro ${modelo}:`, err.message); continue }
@@ -417,5 +456,8 @@ REGRAS CRÍTICAS:
     }
   }
 
-  return res.status(500).json({ erro:'Todas as APIs falharam. Tente novamente em alguns minutos.' })
+  const msgFinal = tipo === 'auto'
+    ? 'Não foi possível identificar o documento. Certifique-se que é um PDF de ASO, LTCAT ou PCMSO e que a ANTHROPIC_API_KEY está configurada.'
+    : 'Todas as APIs falharam. Tente novamente em alguns minutos.'
+  return res.status(500).json({ erro: msgFinal })
 }
