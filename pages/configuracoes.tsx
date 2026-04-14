@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -43,8 +44,9 @@ export default function Configuracoes() {
     if (!session) { router.push('/'); return }
     const { data:user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
-    const { data:emp } = await supabase.from('empresas').select('*').eq('id', user.empresa_id).single()
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
+    const { data:emp } = await supabase.from('empresas').select('*').eq('id', empId).single()
     if (emp) {
       setEmpresa(emp)
       setFormEmpresa({

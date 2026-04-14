@@ -166,7 +166,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'eSocial SST <noreply@esocial-sst.vercel.app>',
+        from: 'eSocial SST <onboarding@resend.dev>',
         to: [email_destino],
         subject: `⚠ ${relevantes.length} ASO(s) com vencimento — ${empresa.razao_social}`,
         html: htmlEmail,

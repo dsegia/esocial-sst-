@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
 import { pdfFichaEPI } from '../lib/gerarPDF'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -47,13 +48,14 @@ export default function LTCAT() {
     if (!session) { router.push('/'); return }
     const { data: user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
-    supabase.from('empresas').select('razao_social,cnpj').eq('id', user.empresa_id).single()
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
+    supabase.from('empresas').select('razao_social,cnpj').eq('id', empId).single()
       .then(({ data: emp }) => { if (emp) { setNomeEmpresa(emp.razao_social); setCnpjEmpresa(emp.cnpj) } })
-    const { data } = await supabase.from('ltcats').select('*').eq('empresa_id', user.empresa_id).order('data_emissao', { ascending: false })
+    const { data } = await supabase.from('ltcats').select('*').eq('empresa_id', empId).order('data_emissao', { ascending: false })
     setLtcats(data || [])
     if (data?.length > 0) setLtcatSel(data[0])
-    const { data: funcs } = await supabase.from('funcionarios').select('id,nome,funcao,setor,ghe_id').eq('empresa_id', user.empresa_id).eq('ativo', true)
+    const { data: funcs } = await supabase.from('funcionarios').select('id,nome,funcao,setor,ghe_id').eq('empresa_id', empId).eq('ativo', true)
     setTodosFunc(funcs || [])
     setCarregando(false)
   }

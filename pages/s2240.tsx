@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -36,12 +37,13 @@ export default function S2240() {
     if (!session) { router.push('/'); return }
     const { data: user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
 
     const [funcsRes, ltcatRes, txRes] = await Promise.all([
-      supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc,ghe_id').eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome'),
-      supabase.from('ltcats').select('*').eq('empresa_id', user.empresa_id).eq('ativo', true).order('data_emissao', { ascending: false }).limit(1).single(),
-      supabase.from('transmissoes').select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em,erro_descricao').eq('empresa_id', user.empresa_id).eq('evento', 'S-2240').order('criado_em', { ascending: false }),
+      supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc,ghe_id').eq('empresa_id', empId).eq('ativo', true).order('nome'),
+      supabase.from('ltcats').select('*').eq('empresa_id', empId).eq('ativo', true).order('data_emissao', { ascending: false }).limit(1).single(),
+      supabase.from('transmissoes').select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em,erro_descricao').eq('empresa_id', empId).eq('evento', 'S-2240').order('criado_em', { ascending: false }),
     ])
 
     setFuncionarios(funcsRes.data || [])

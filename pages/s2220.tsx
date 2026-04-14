@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
 import { pdfConformidadeASO } from '../lib/gerarPDF'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -34,20 +35,21 @@ export default function S2220() {
     const { data: user } = await supabase.from('usuarios')
       .select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
-    supabase.from('empresas').select('razao_social,cnpj').eq('id', user.empresa_id).single()
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
+    supabase.from('empresas').select('razao_social,cnpj').eq('id', empId).single()
       .then(({ data: emp }) => { if (emp) { setNomeEmpresa(emp.razao_social); setCnpjEmpresa(emp.cnpj) } })
 
     const [funcsRes, asosRes, txRes] = await Promise.all([
       supabase.from('funcionarios')
         .select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc')
-        .eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome'),
+        .eq('empresa_id', empId).eq('ativo', true).order('nome'),
       supabase.from('asos').select('*')
-        .eq('empresa_id', user.empresa_id)
+        .eq('empresa_id', empId)
         .order('data_exame', { ascending: false }),
       supabase.from('transmissoes')
         .select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em,erro_descricao')
-        .eq('empresa_id', user.empresa_id).eq('evento', 'S-2220')
+        .eq('empresa_id', empId).eq('evento', 'S-2220')
         .order('criado_em', { ascending: false }),
     ])
 

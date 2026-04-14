@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -54,10 +55,11 @@ export default function S2210() {
     if (!session) { router.push('/'); return }
     const { data: user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
-    const { data: funcs } = await supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor').eq('empresa_id', user.empresa_id).eq('ativo', true).order('nome')
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
+    const { data: funcs } = await supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor').eq('empresa_id', empId).eq('ativo', true).order('nome')
     setFuncionarios(funcs || [])
-    await carregarCats(user.empresa_id)
+    await carregarCats(empId)
     setCarregando(false)
   }
 

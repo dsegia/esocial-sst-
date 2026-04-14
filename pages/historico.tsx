@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -34,15 +35,16 @@ export default function Historico() {
     if (!session) { router.push('/'); return }
     const { data:user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
 
     // Verificar se empresa tem certificado digital
     const { data:empresa } = await supabase.from('empresas')
       .select('cert_digital_validade, cert_tipo')
-      .eq('id', user.empresa_id).single()
+      .eq('id', empId).single()
     setTemCertificado(!!empresa?.cert_digital_validade)
 
-    await carregar(user.empresa_id, '', '')
+    await carregar(empId, '', '')
     setCarregando(false)
   }
 

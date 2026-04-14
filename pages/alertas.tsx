@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
+import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,9 +37,10 @@ export default function Alertas() {
     if (!session) { router.push('/'); return }
     const { data: user } = await supabase.from('usuarios').select('empresa_id, email').eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
-    setEmpresaId(user.empresa_id)
+    const empId = getEmpresaId() || user.empresa_id
+    setEmpresaId(empId)
     if (user.email) setEmailDestino(user.email)
-    const { data } = await supabase.rpc('get_alertas_vencimento', { p_empresa_id: user.empresa_id })
+    const { data } = await supabase.rpc('get_alertas_vencimento', { p_empresa_id: empId })
     setAlertas(data as Alerta[] || [])
     setCarregando(false)
   }
