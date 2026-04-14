@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -51,12 +51,6 @@ export default function PCMSO() {
   })
   const [novoExame, setNovoExame] = useState({ nome:'', periodicidade:'Anual', obrigatorio:true })
   const [salvandoProg, setSalvandoProg] = useState(false)
-
-  // ── Import inline ──
-  const importRef = useRef()
-  const [modoImport, setModoImport] = useState('none') // none|upload|lendo|preview|salvando
-  const [importProgresso, setImportProgresso] = useState('')
-  const [importDados, setImportDados] = useState(null)
 
   useEffect(() => { init() }, [])
 
@@ -180,73 +174,6 @@ export default function PCMSO() {
     init()
   }
 
-  // ── Funções de import inline ─────────────────────────────
-  async function processarImportPCMSO(file) {
-    if (!file) return
-    setModoImport('lendo')
-    try {
-      setImportProgresso('Preparando PDF...')
-      const buf = await file.arrayBuffer()
-      const bytes = new Uint8Array(buf)
-      let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
-      const pdf_base64 = btoa(bin)
-
-      let texto_pdf = ''
-      try {
-        if (!window.pdfjsLib) {
-          await new Promise((res, rej) => {
-            const s = document.createElement('script')
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-            s.onload = res; s.onerror = rej; document.head.appendChild(s)
-          })
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-        }
-        const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise
-        for (let i = 1; i <= Math.min(pdf.numPages, 6); i++) {
-          const p = await pdf.getPage(i); const c = await p.getTextContent()
-          texto_pdf += c.items.map(it => it.str).join(' ') + '\n'
-        }
-      } catch {}
-
-      setImportProgresso('Analisando com Claude IA...')
-      const resp = await fetch('/api/ler-documento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdf_base64, texto_pdf, paginas: [], tipo: 'pcmso' })
-      })
-      const json = await resp.json()
-      if (!resp.ok || !json.sucesso) throw new Error(json.erro || 'Erro na leitura')
-      setImportDados(json.dados)
-      setModoImport('preview')
-    } catch (err) {
-      setErro('Erro ao processar: ' + err.message)
-      setModoImport('upload')
-    }
-  }
-
-  async function confirmarImportPCMSO() {
-    if (!importDados?.programas?.length) { setErro('Nenhum programa encontrado no PDF.'); return }
-    setModoImport('salvando')
-    for (const prog of importDados.programas) {
-      await supabase.from('pcmso_programa').upsert({
-        empresa_id: empresaId,
-        funcao: prog.funcao,
-        setor: prog.setor || null,
-        riscos: prog.riscos || [],
-        exames: (prog.exames || []).map(e => ({
-          nome: typeof e === 'string' ? e : e.nome,
-          periodicidade: e.periodicidade || 'Anual',
-          obrigatorio: true,
-        })),
-        atualizado_em: new Date().toISOString(),
-      }, { onConflict: 'empresa_id,funcao' })
-    }
-    setSucesso(`PCMSO importado! ${importDados.programas.length} programa(s) cadastrado(s).`)
-    setModoImport('none')
-    await init()
-  }
-
   const setores = [...new Set(funcionarios.map(f => f.setor).filter(Boolean))]
   const funcsFiltradas = filtroSetor ? funcionarios.filter(f => f.setor === filtroSetor) : funcionarios
   const totalEmDia = funcionarios.filter(f => statusAso(ultimoAso(f.id)).label === 'Em dia').length
@@ -269,7 +196,7 @@ export default function PCMSO() {
             const crm    = ltcatAtivo?.resp_registro || ''
             pdfPCMSO(nomeEmpresa, cnpjEmpresa, medico, crm, programa)
           }}>📄 Exportar PDF</button>
-          <button style={s.btnOutline} onClick={() => { setModoImport('upload'); setErro('') }}>↑ Importar PDF / XML</button>
+          <button style={s.btnOutline} onClick={() => router.push('/importar')}>↑ Importar PDF</button>
           <button style={s.btnPrimary} onClick={() => {
             setEditandoFunc(null)
             setFormFunc({ funcao:'', setor:'', riscos:[], exames:[] })
@@ -465,108 +392,6 @@ export default function PCMSO() {
                 })}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Import inline overlay ─────────────────────────────────────── */}
-      <input ref={importRef} type="file" accept=".pdf" style={{ display:'none' }}
-        onChange={e => { if (e.target.files?.[0]) processarImportPCMSO(e.target.files[0]); e.target.value='' }} />
-
-      {modoImport !== 'none' && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-          <div style={{ background:'#fff', borderRadius:14, padding:'2rem', maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto' }}>
-
-            {/* Upload */}
-            {modoImport === 'upload' && (
-              <div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-                  <div style={{ fontSize:16, fontWeight:700, color:'#111' }}>Importar PCMSO — PDF</div>
-                  <button onClick={() => setModoImport('none')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
-                </div>
-                <div onClick={() => importRef.current?.click()} style={{
-                  border:'2px dashed #d1d5db', borderRadius:12, padding:'2.5rem', textAlign:'center', cursor:'pointer',
-                  background:'#f9fafb', marginBottom:16,
-                }}>
-                  <div style={{ fontSize:32, marginBottom:10 }}>📄</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:'#374151' }}>Clique para selecionar o PDF do PCMSO</div>
-                  <div style={{ fontSize:12, color:'#9ca3af', marginTop:4 }}>A IA irá extrair os programas por função automaticamente</div>
-                </div>
-                <button onClick={() => setModoImport('none')} style={{ ...s.btnOutline, width:'100%' }}>Cancelar</button>
-              </div>
-            )}
-
-            {/* Lendo */}
-            {modoImport === 'lendo' && (
-              <div style={{ textAlign:'center', padding:'2rem 0' }}>
-                <div style={{ fontSize:32, marginBottom:14 }}>🤖</div>
-                <div style={{ fontSize:15, fontWeight:600, color:'#111', marginBottom:8 }}>Analisando PCMSO...</div>
-                <div style={{ fontSize:13, color:'#6b7280' }}>{importProgresso}</div>
-                <div style={{ marginTop:20, height:4, background:'#f3f4f6', borderRadius:99 }}>
-                  <div style={{ height:'100%', width:'60%', background:'#27500A', borderRadius:99, animation:'none' }}></div>
-                </div>
-              </div>
-            )}
-
-            {/* Preview */}
-            {modoImport === 'preview' && importDados && (
-              <div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-                  <div style={{ fontSize:16, fontWeight:700, color:'#111' }}>Dados extraídos do PCMSO</div>
-                  <button onClick={() => setModoImport('none')} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
-                </div>
-
-                {importDados.programas?.length > 0 ? (
-                  <div>
-                    <div style={{ fontSize:12, color:'#6b7280', marginBottom:12 }}>
-                      {importDados.programas.length} programa(s) encontrado(s) no documento
-                    </div>
-                    {importDados.programas.slice(0,5).map((prog, i) => (
-                      <div key={i} style={{ border:'0.5px solid #e5e7eb', borderRadius:8, padding:'10px 12px', marginBottom:8 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:'#111' }}>{prog.funcao}</div>
-                        {prog.setor && <div style={{ fontSize:11, color:'#6b7280' }}>Setor: {prog.setor}</div>}
-                        <div style={{ fontSize:11, color:'#374151', marginTop:4 }}>
-                          {(prog.exames||[]).slice(0,4).map((e,j) => (
-                            <span key={j} style={{ display:'inline-block', background:'#EAF3DE', color:'#27500A', borderRadius:99, padding:'1px 8px', fontSize:10, margin:'2px 3px 2px 0' }}>
-                              {typeof e === 'string' ? e : e.nome}
-                            </span>
-                          ))}
-                          {(prog.exames||[]).length > 4 && <span style={{ fontSize:10, color:'#9ca3af' }}>+{prog.exames.length-4}</span>}
-                        </div>
-                      </div>
-                    ))}
-                    {importDados.programas.length > 5 && (
-                      <div style={{ fontSize:12, color:'#9ca3af', textAlign:'center', marginBottom:8 }}>
-                        +{importDados.programas.length - 5} programa(s) adicional(is)
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ ...s.erroBox, marginBottom:12 }}>Nenhum programa encontrado no PDF.</div>
-                )}
-
-                {erro && <div style={s.erroBox}>{erro}</div>}
-
-                <div style={{ display:'flex', gap:8, marginTop:16 }}>
-                  <button style={s.btnPrimary} onClick={confirmarImportPCMSO}
-                    disabled={!importDados.programas?.length}>
-                    ✓ Confirmar e salvar
-                  </button>
-                  <button style={s.btnOutline} onClick={() => { setModoImport('upload'); setImportDados(null) }}>
-                    Tentar novamente
-                  </button>
-                  <button style={s.btnOutline} onClick={() => setModoImport('none')}>Cancelar</button>
-                </div>
-              </div>
-            )}
-
-            {/* Salvando */}
-            {modoImport === 'salvando' && (
-              <div style={{ textAlign:'center', padding:'2rem 0' }}>
-                <div style={{ fontSize:32, marginBottom:14 }}>💾</div>
-                <div style={{ fontSize:15, fontWeight:600, color:'#111' }}>Salvando programas...</div>
-              </div>
-            )}
           </div>
         </div>
       )}

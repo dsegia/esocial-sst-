@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -40,12 +40,6 @@ export default function LTCAT() {
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
-
-  // ── Import inline ──
-  const importRef = useRef()
-  const [modoImport, setModoImport] = useState('none') // none | upload | lendo | preview | salvando
-  const [importProgresso, setImportProgresso] = useState('')
-  const [importDados, setImportDados] = useState(null)
 
   useEffect(() => { init() }, [])
 
@@ -200,78 +194,6 @@ export default function LTCAT() {
     return Math.round((new Date(d) - new Date()) / 86400000)
   }
 
-  // ── Funções de import inline ─────────────────────────────
-  async function abrirImport() { setModoImport('upload'); setImportProgresso(''); setImportDados(null) }
-  function fecharImport() { setModoImport('none') }
-
-  async function processarImportLTCAT(file) {
-    if (!file) return
-    setModoImport('lendo')
-    try {
-      // Lê PDF como base64 (nativo Anthropic)
-      setImportProgresso('Preparando PDF...')
-      const buf = await file.arrayBuffer()
-      const bytes = new Uint8Array(buf)
-      let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
-      const pdf_base64 = btoa(bin)
-
-      // Extrai texto (fallback)
-      let texto_pdf = ''
-      try {
-        if (!window.pdfjsLib) {
-          await new Promise((res, rej) => {
-            const s = document.createElement('script')
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-            s.onload = res; s.onerror = rej; document.head.appendChild(s)
-          })
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-        }
-        const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise
-        for (let i = 1; i <= Math.min(pdf.numPages, 6); i++) {
-          const page = await pdf.getPage(i)
-          const content = await page.getTextContent()
-          texto_pdf += content.items.map(it => it.str).join(' ') + '\n'
-        }
-      } catch {}
-
-      setImportProgresso('Analisando com Claude IA...')
-      const resp = await fetch('/api/ler-documento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdf_base64, texto_pdf, paginas: [], tipo: 'ltcat' })
-      })
-      const json = await resp.json()
-      if (!resp.ok || !json.sucesso) throw new Error(json.erro || 'Erro na leitura')
-      setImportDados(json.dados)
-      setModoImport('preview')
-    } catch (err) {
-      setErro('Erro ao processar: ' + err.message)
-      setModoImport('upload')
-    }
-  }
-
-  async function confirmarImportLTCAT() {
-    if (!importDados) return
-    setModoImport('salvando')
-    const d = importDados
-    const { error } = await supabase.from('ltcats').insert({
-      empresa_id:    empresaId,
-      data_emissao:  d.dados_gerais?.data_emissao || new Date().toISOString().split('T')[0],
-      data_vigencia: d.dados_gerais?.data_vigencia || new Date().toISOString().split('T')[0],
-      prox_revisao:  d.dados_gerais?.prox_revisao || null,
-      resp_nome:     d.dados_gerais?.resp_nome || null,
-      resp_conselho: d.dados_gerais?.resp_conselho || 'CREA',
-      resp_registro: d.dados_gerais?.resp_registro || null,
-      ghes:          d.ghes || [],
-      ativo:         true,
-    })
-    if (error) { setErro('Erro ao salvar: ' + error.message); setModoImport('preview'); return }
-    setSucesso(`LTCAT importado! ${d.ghes?.length || 0} GHE(s) cadastrado(s).`)
-    setModoImport('none')
-    await init()
-  }
-
   if (carregando) return <div style={s.loading}>Carregando...</div>
 
   const ghe = modoEdicao ? formLtcat?.ghes?.[gheAtivo] : ltcatSel?.ghes?.[gheAtivo]
@@ -287,7 +209,6 @@ export default function LTCAT() {
         </div>
         {!modoEdicao && (
           <div style={{ display:'flex', gap:8 }}>
-            <button style={s.btnOutline} onClick={() => abrirImport()}>↑ Importar PDF / XML</button>
             <button style={s.btnPrimary} onClick={() => router.push('/s2240')}>+ Novo manual</button>
           </div>
         )}
@@ -296,84 +217,6 @@ export default function LTCAT() {
       {sucesso && <div style={s.sucessoBox}>{sucesso}</div>}
       {erro    && <div style={s.erroBox}>{erro}</div>}
 
-      {/* ── Leitor inline ── */}
-      {modoImport !== 'none' && (
-        <div style={{ background:'#fff', border:'1.5px solid #854F0B', borderRadius:12, padding:'1.25rem', marginBottom:16 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'#854F0B' }}>Importar LTCAT via PDF</div>
-            <button onClick={fecharImport} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#9ca3af', lineHeight:1 }}>✕</button>
-          </div>
-
-          {modoImport === 'upload' && (
-            <div>
-              <div style={{ border:'2px dashed #d1d5db', borderRadius:10, padding:'2rem', textAlign:'center', cursor:'pointer' }}
-                onClick={() => importRef.current.click()}
-                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor='#854F0B' }}
-                onDragLeave={e => { e.currentTarget.style.borderColor='#d1d5db' }}
-                onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor='#d1d5db'; const f=e.dataTransfer.files[0]; if(f) processarImportLTCAT(f) }}>
-                <div style={{ fontSize:13, color:'#374151', marginBottom:4 }}>Clique ou arraste o PDF do LTCAT aqui</div>
-                <div style={{ fontSize:11, color:'#9ca3af' }}>PDF digital ou escaneado · Leitura com Claude IA</div>
-              </div>
-              <input ref={importRef} type="file" accept=".pdf" style={{ display:'none' }}
-                onChange={e => processarImportLTCAT(e.target.files[0])} />
-            </div>
-          )}
-
-          {modoImport === 'lendo' && (
-            <div style={{ textAlign:'center', padding:'1.5rem' }}>
-              <div style={{ width:36, height:36, border:'3px solid #854F0B', borderTopColor:'transparent', borderRadius:'50%', margin:'0 auto 12px', animation:'spin 1s linear infinite' }}></div>
-              <div style={{ fontSize:13, color:'#374151' }}>{importProgresso || 'Processando...'}</div>
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            </div>
-          )}
-
-          {modoImport === 'preview' && importDados && (
-            <div>
-              <div style={{ background:'#FAEEDA', border:'0.5px solid #FAC775', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#633806', marginBottom:12 }}>
-                Dados extraídos pelo Claude — revise antes de confirmar.
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:12 }}>
-                {[
-                  ['Responsável', importDados.dados_gerais?.resp_nome],
-                  ['Conselho', importDados.dados_gerais?.resp_conselho],
-                  ['Registro', importDados.dados_gerais?.resp_registro],
-                  ['Data emissão', importDados.dados_gerais?.data_emissao],
-                  ['Data vigência', importDados.dados_gerais?.data_vigencia],
-                  ['Próxima revisão', importDados.dados_gerais?.prox_revisao],
-                ].map(([label, val]) => (
-                  <div key={label} style={{ fontSize:12 }}>
-                    <div style={{ color:'#6b7280', marginBottom:2 }}>{label}</div>
-                    <div style={{ fontWeight:500, color:'#111' }}>{val || '—'}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ background:'#f9fafb', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#374151', marginBottom:12 }}>
-                <strong>{importDados.ghes?.length || 0} GHE(s) identificado(s)</strong>
-                {importDados.ghes?.map((g, i) => (
-                  <div key={i} style={{ marginTop:4, paddingLeft:8, borderLeft:'2px solid #FAC775' }}>
-                    {g.nome} · {g.funcoes?.length || 0} função(ões) · {g.agentes?.length || 0} agente(s)
-                  </div>
-                ))}
-              </div>
-              <div style={{ display:'flex', gap:8 }}>
-                <button onClick={confirmarImportLTCAT}
-                  style={{ padding:'8px 18px', background:'#854F0B', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
-                  Confirmar e salvar →
-                </button>
-                <button onClick={() => setModoImport('upload')}
-                  style={{ padding:'8px 14px', background:'transparent', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', color:'#374151' }}>
-                  Reimportar
-                </button>
-              </div>
-            </div>
-          )}
-
-          {modoImport === 'salvando' && (
-            <div style={{ textAlign:'center', padding:'1.5rem', fontSize:13, color:'#374151' }}>Salvando LTCAT...</div>
-          )}
-        </div>
-      )}
-
       {ltcats.length === 0 ? (
         <div style={s.emptyCard}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5">
@@ -381,9 +224,9 @@ export default function LTCAT() {
             <polyline points="14,3 14,8 19,8"/>
           </svg>
           <div style={{ fontSize:14, fontWeight:500, color:'#374151', marginTop:12 }}>Nenhum LTCAT cadastrado</div>
-          <div style={{ fontSize:12, color:'#9ca3af', marginTop:4 }}>Importe um PDF ou cadastre manualmente</div>
+          <div style={{ fontSize:12, color:'#9ca3af', marginTop:4 }}>Use a página Importar PDF para adicionar um LTCAT</div>
           <div style={{ display:'flex', gap:8, marginTop:16 }}>
-            <button style={s.btnOutline} onClick={() => abrirImport()}>↑ Importar PDF / XML</button>
+            <button style={s.btnOutline} onClick={() => router.push('/importar')}>↑ Importar PDF</button>
             <button style={s.btnPrimary} onClick={() => router.push('/s2240')}>+ Novo manual</button>
           </div>
         </div>
