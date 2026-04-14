@@ -20,14 +20,18 @@ export default function Leitor() {
   const [dados, setDados] = useState(null)
   const [dadosEditados, setDadosEditados] = useState(null)
   const [tipoDetectado, setTipoDetectado] = useState('')
-  // Tipo selecionado explicitamente — inicializado do query param quando router estiver pronto
+  // Tipo selecionado — inicializado do query param quando router estiver pronto
   const [tipoFixo, setTipoFixo] = useState('aso')
+  const [tipoLocked, setTipoLocked] = useState(false) // true quando veio de outra página (?tipo=...)
   const [modoLeitura, setModoLeitura] = useState('')
 
   useEffect(() => {
     if (router.isReady) {
       const t = router.query.tipo
-      if (t === 'ltcat' || t === 'pcmso' || t === 'aso') setTipoFixo(t)
+      if (t === 'ltcat' || t === 'pcmso' || t === 'aso') {
+        setTipoFixo(t)
+        setTipoLocked(true) // veio de ASO/LTCAT/PCMSO — não mostrar seletor
+      }
     }
   }, [router.isReady, router.query.tipo])
   const [empresaId, setEmpresaId] = useState('')
@@ -355,28 +359,30 @@ export default function Leitor() {
       {/* UPLOAD */}
       {etapa === 'upload' && (
         <div style={s.card}>
-          {/* Seletor de tipo explícito */}
-          <div style={{ marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:8 }}>Tipo de documento</div>
-            <div style={{ display:'flex', gap:8 }}>
-              {[
-                { v:'aso',   l:'ASO',   desc:'Atestado de Saúde Ocupacional (S-2220)', c:'#185FA5', bg:'#E6F1FB' },
-                { v:'ltcat', l:'LTCAT', desc:'Laudo Técnico das Condições Ambientais (S-2240)', c:'#854F0B', bg:'#FAEEDA' },
-                { v:'pcmso', l:'PCMSO', desc:'Programa de Controle Médico (NR-7)', c:'#27500A', bg:'#EAF3DE' },
-              ].map(t => (
-                <button key={t.v} onClick={() => setTipoFixo(t.v)}
-                  style={{
-                    flex:1, padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
-                    border: tipoFixo === t.v ? `2px solid ${t.c}` : '1.5px solid #e5e7eb',
-                    background: tipoFixo === t.v ? t.bg : '#fff',
-                    transition:'all .12s',
-                  }}>
-                  <div style={{ fontSize:13, fontWeight:700, color: tipoFixo === t.v ? t.c : '#374151' }}>{t.l}</div>
-                  <div style={{ fontSize:10, color:'#6b7280', marginTop:2, lineHeight:1.4 }}>{t.desc}</div>
-                </button>
-              ))}
+          {/* Seletor de tipo — só aparece quando não veio de uma página específica */}
+          {!tipoLocked && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:8 }}>Tipo de documento</div>
+              <div style={{ display:'flex', gap:8 }}>
+                {[
+                  { v:'aso',   l:'ASO',   desc:'Atestado de Saúde Ocupacional (S-2220)', c:'#185FA5', bg:'#E6F1FB' },
+                  { v:'ltcat', l:'LTCAT', desc:'Laudo Técnico das Condições Ambientais (S-2240)', c:'#854F0B', bg:'#FAEEDA' },
+                  { v:'pcmso', l:'PCMSO', desc:'Programa de Controle Médico (NR-7)', c:'#27500A', bg:'#EAF3DE' },
+                ].map(t => (
+                  <button key={t.v} onClick={() => setTipoFixo(t.v)}
+                    style={{
+                      flex:1, padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
+                      border: tipoFixo === t.v ? `2px solid ${t.c}` : '1.5px solid #e5e7eb',
+                      background: tipoFixo === t.v ? t.bg : '#fff',
+                      transition:'all .12s',
+                    }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: tipoFixo === t.v ? t.c : '#374151' }}>{t.l}</div>
+                    <div style={{ fontSize:10, color:'#6b7280', marginTop:2, lineHeight:1.4 }}>{t.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div style={s.dropZone}
             onClick={() => inputRef.current.click()}
