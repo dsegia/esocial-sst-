@@ -56,7 +56,7 @@ export default function Admin() {
   const [busca, setBusca] = useState('')
   const [ordenar, setOrdenar] = useState<'trans_mes' | 'razao_social' | 'created_at' | 'trans_erro'>('trans_mes')
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
-  const [aba, setAba] = useState<'dashboard' | 'clientes'>('dashboard')
+  const [aba, setAba] = useState<'dashboard' | 'clientes' | 'sistema'>('dashboard')
 
   // Modal novo cliente
   const [modalConvite, setModalConvite] = useState(false)
@@ -72,7 +72,17 @@ export default function Admin() {
   // Bloqueio inline
   const [bloqueandoId, setBloqueandoId] = useState<string | null>(null)
 
+  // Aba Sistema
+  const [sistema, setSistema] = useState<any>(null)
+  const [carregandoSistema, setCarregandoSistema] = useState(false)
+  const [erroSistema, setErroSistema] = useState('')
+  const [marcandoErro, setMarcandoErro] = useState<string | null>(null)
+
   useEffect(() => { carregar() }, [])
+
+  useEffect(() => {
+    if (aba === 'sistema') carregarSistema()
+  }, [aba])
 
   async function carregar() {
     setCarregando(true)
@@ -97,6 +107,39 @@ export default function Admin() {
       setErro(e.message)
     } finally {
       setCarregando(false)
+    }
+  }
+
+  async function carregarSistema() {
+    setCarregandoSistema(true)
+    setErroSistema('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/admin/sistema', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const json = await resp.json()
+      if (!resp.ok) throw new Error(json.erro || 'Erro ao carregar')
+      setSistema(json)
+    } catch (e: any) {
+      setErroSistema(e.message)
+    } finally {
+      setCarregandoSistema(false)
+    }
+  }
+
+  async function marcarTransmissaoErro(transmissaoId: string) {
+    setMarcandoErro(transmissaoId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/admin/sistema', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ acao: 'marcar_erro', transmissao_id: transmissaoId }),
+      })
+      if (resp.ok) carregarSistema()
+    } finally {
+      setMarcandoErro(null)
     }
   }
 
@@ -270,7 +313,7 @@ export default function Admin() {
 
         {/* Abas */}
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', gap: 0 }}>
-          {([['dashboard', 'Visão Geral'], ['clientes', 'Clientes']] as const).map(([id, label]) => (
+          {([['dashboard', 'Visão Geral'], ['clientes', 'Clientes'], ['sistema', 'Sistema']] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => { setAba(id); setBusca('') }}
@@ -602,6 +645,231 @@ export default function Admin() {
             </div>
           </div>
         )}
+        {/* ===== ABA: SISTEMA ===== */}
+        {aba === 'sistema' && (
+          <div>
+            {/* Cabeçalho */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Monitoramento do Sistema</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                  {sistema ? `Atualizado às ${new Date(sistema.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Verificando...'}
+                </div>
+              </div>
+              <button
+                onClick={carregarSistema}
+                disabled={carregandoSistema}
+                style={{ padding: '7px 14px', background: '#1f2937', border: '1px solid #374151', borderRadius: 7, color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}
+              >
+                {carregandoSistema ? 'Verificando...' : '↻ Atualizar agora'}
+              </button>
+            </div>
+
+            {erroSistema && (
+              <div style={{ background: '#FCEBEB', color: '#791F1F', borderRadius: 10, padding: '12px 16px', fontSize: 12, marginBottom: 16 }}>{erroSistema}</div>
+            )}
+
+            {carregandoSistema && !sistema && (
+              <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, padding: '3rem' }}>Verificando serviços...</div>
+            )}
+
+            {sistema && (() => {
+              const { servicos, transmissoes: tx, api_logs } = sistema
+
+              function statusServico(key: string) {
+                const svc = servicos[key]
+                if (!svc) return 'cinza'
+                if (key === 'govbr') return svc.acessivel ? 'verde' : 'vermelho'
+                if (key === 'supabase') return svc.ativo ? 'verde' : 'vermelho'
+                if (!svc.key_configurada) return 'vermelho'
+                if (!svc.logs_24h) return 'amarelo' // key ok, sem dados ainda
+                if (svc.logs_24h.taxa_sucesso === null) return 'amarelo'
+                if (svc.logs_24h.taxa_sucesso >= 80) return 'verde'
+                if (svc.logs_24h.taxa_sucesso >= 50) return 'amarelo'
+                return 'vermelho'
+              }
+
+              const corStatus: Record<string, string> = { verde: '#27a048', amarelo: '#EF9F27', vermelho: '#dc2626', cinza: '#9ca3af' }
+              const bgStatus:  Record<string, string> = { verde: '#EAF3DE', amarelo: '#FAEEDA', vermelho: '#FCEBEB', cinza: '#f3f4f6' }
+
+              return (
+                <>
+                  {/* Cards de serviços */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                    {[
+                      {
+                        key: 'anthropic', label: 'Claude (Anthropic)',
+                        sub: servicos.anthropic.key_configurada ? 'Key configurada' : 'Key não configurada',
+                        detalhe: servicos.anthropic.logs_24h
+                          ? `${servicos.anthropic.logs_24h.total} chamadas hoje · ${servicos.anthropic.logs_24h.taxa_sucesso}% OK · ~${servicos.anthropic.logs_24h.media_ms}ms`
+                          : api_logs.disponivel ? 'Sem chamadas nas últimas 24h' : 'Sem dados de log',
+                        fallbackNote: servicos.anthropic.logs_24h?.fallback > 0 ? `${servicos.anthropic.logs_24h.fallback}x fallback para Gemini` : null,
+                      },
+                      {
+                        key: 'gemini', label: 'Gemini (Google)',
+                        sub: servicos.gemini.key_configurada ? 'Key configurada' : 'Key não configurada',
+                        detalhe: servicos.gemini.logs_24h
+                          ? `${servicos.gemini.logs_24h.total} chamadas hoje · ${servicos.gemini.logs_24h.taxa_sucesso}% OK · ~${servicos.gemini.logs_24h.media_ms}ms`
+                          : api_logs.disponivel ? 'Sem chamadas nas últimas 24h' : 'Sem dados de log',
+                        fallbackNote: null,
+                      },
+                      {
+                        key: 'govbr', label: 'eSocial Gov.br',
+                        sub: servicos.govbr.acessivel
+                          ? `Acessível · ${servicos.govbr.latencia_ms}ms`
+                          : `Inacessível${servicos.govbr.erro ? ': ' + servicos.govbr.erro : ''}`,
+                        detalhe: `${tx.stats_7d.enviado} enviados · ${tx.stats_7d.rejeitado} rejeitados nos últimos 7 dias`,
+                        fallbackNote: null,
+                      },
+                      {
+                        key: 'supabase', label: 'Supabase (DB)',
+                        sub: 'Conectado',
+                        detalhe: `${tx.stats_7d.total} transmissões registradas (7d)`,
+                        fallbackNote: null,
+                      },
+                    ].map(({ key, label, sub, detalhe, fallbackNote }) => {
+                      const st = statusServico(key)
+                      return (
+                        <div key={key} style={{ background: '#fff', border: `1px solid ${corStatus[st]}30`, borderRadius: 12, padding: '1rem 1.25rem', borderTop: `3px solid ${corStatus[st]}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: corStatus[st], flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#111' }}>{label}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: corStatus[st], fontWeight: 600, marginBottom: 4 }}>{sub}</div>
+                          <div style={{ fontSize: 11, color: '#6b7280' }}>{detalhe}</div>
+                          {fallbackNote && (
+                            <div style={{ fontSize: 10, color: '#EF9F27', marginTop: 4 }}>⚠ {fallbackNote}</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Auto-heal info */}
+                  <div style={{ background: '#E6F1FB', border: '0.5px solid #185FA530', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 12, color: '#185FA5' }}>
+                    <strong>Auto-heal ativo:</strong> Se Claude falhar, o sistema tenta automaticamente Gemini como fallback (e vice-versa para ASO).
+                    {servicos.anthropic.logs_24h?.fallback > 0 && ` Hoje ocorreram ${servicos.anthropic.logs_24h.fallback} fallbacks.`}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+                    {/* Transmissões presas (pendente > 2h) */}
+                    <div style={{ background: '#fff', border: '0.5px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                      <div style={{ padding: '12px 16px', borderBottom: '0.5px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: tx.pendentes_presos.length > 0 ? '#EF9F27' : '#27a048' }} />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>
+                          Transmissões presas ({tx.pendentes_presos.length})
+                        </div>
+                        <span style={{ fontSize: 11, color: '#9ca3af' }}>pendente &gt; 2h</span>
+                      </div>
+                      {tx.pendentes_presos.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>Nenhuma transmissão presa</div>
+                      ) : tx.pendentes_presos.map((t: any) => (
+                        <div key={t.id} style={{ padding: '10px 16px', borderBottom: '0.5px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{t.empresa_nome}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280' }}>{t.evento} · Tentativas: {t.tentativas}</div>
+                            <div style={{ fontSize: 10, color: '#9ca3af' }}>{fmtData(t.criado_em)}</div>
+                          </div>
+                          <button
+                            onClick={() => marcarTransmissaoErro(t.id)}
+                            disabled={marcandoErro === t.id}
+                            title="Marcar como erro para que a empresa possa reenviar"
+                            style={{ padding: '4px 8px', background: '#FCEBEB', color: '#791F1F', border: 'none', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            {marcandoErro === t.id ? '...' : 'Marcar erro'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Transmissões rejeitadas recentes */}
+                    <div style={{ background: '#fff', border: '0.5px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                      <div style={{ padding: '12px 16px', borderBottom: '0.5px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: tx.rejeitados.length > 0 ? '#dc2626' : '#27a048' }} />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>
+                          Rejeitados recentes ({tx.rejeitados.length})
+                        </div>
+                      </div>
+                      {tx.rejeitados.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>Nenhuma rejeição</div>
+                      ) : tx.rejeitados.slice(0, 8).map((t: any) => (
+                        <div key={t.id} style={{ padding: '10px 16px', borderBottom: '0.5px solid #f3f4f6' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{t.empresa_nome}</span>
+                            <span style={{ fontSize: 11, color: '#9ca3af' }}>·</span>
+                            <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{t.evento}</span>
+                          </div>
+                          {t.erro_codigo && (
+                            <div style={{ fontSize: 11, color: '#374151' }}>Código: {t.erro_codigo}</div>
+                          )}
+                          {t.erro_descricao && (
+                            <div style={{ fontSize: 11, color: '#dc2626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.erro_descricao}</div>
+                          )}
+                          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{fmtData(t.criado_em)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Log de chamadas IA */}
+                  <div style={{ background: '#fff', border: '0.5px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '0.5px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>Log de chamadas IA — últimas 24h</div>
+                      {!api_logs.disponivel && (
+                        <span style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>Tabela api_logs criada — dados aparecerão nas próximas leituras de documentos</span>
+                      )}
+                    </div>
+                    {api_logs.ultimas.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>
+                        Nenhuma chamada registrada. Importe um documento para começar a registrar.
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: '#f9fafb', borderBottom: '0.5px solid #e5e7eb' }}>
+                              {['Serviço', 'Modelo', 'Status', 'Tipo doc', 'Tempo', 'Horário', 'Erro'].map(h => (
+                                <th key={h} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {api_logs.ultimas.map((log: any, i: number) => {
+                              const corLog = log.status === 'ok' ? '#27a048' : log.status === 'fallback' ? '#EF9F27' : '#dc2626'
+                              return (
+                                <tr key={i} style={{ borderBottom: '0.5px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                  <td style={{ padding: '8px 12px', fontWeight: 600, color: '#374151' }}>{log.servico}</td>
+                                  <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{log.modelo || '—'}</td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <span style={{ padding: '2px 7px', background: corLog + '20', color: corLog, borderRadius: 99, fontWeight: 700, fontSize: 10 }}>
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#6b7280' }}>{log.tipo || '—'}</td>
+                                  <td style={{ padding: '8px 12px', color: '#374151', whiteSpace: 'nowrap' }}>
+                                    {log.duracao_ms != null ? `${log.duracao_ms}ms` : '—'}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#9ca3af', whiteSpace: 'nowrap', fontSize: 11 }}>
+                                    {fmtData(log.criado_em)}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#dc2626', fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {log.erro || '—'}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )}
+
       </div>
 
       {/* ===== MODAL: NOVO CLIENTE ===== */}

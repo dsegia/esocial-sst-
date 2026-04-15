@@ -79,6 +79,16 @@ function codigoAgente(nome) {
   return '09.01.001'
 }
 
+// ── Logger de IA (fire-and-forget, nunca quebra o fluxo) ─────────────
+function logIA(servico, modelo, status, duracao_ms, tipo, erro) {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  fetch(`${base}/api/internal/log-ia`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-internal-secret': 'esocial-internal' },
+    body: JSON.stringify({ servico, modelo, status, duracao_ms: Math.round(duracao_ms || 0), tipo, erro: erro?.substring(0, 200) }),
+  }).catch(() => {})
+}
+
 // ── Prompts ──────────────────────────────────────────────
 const PROMPT_LTCAT = `Você é especialista em LTCAT brasileiro. Analise o documento COMPLETO e retorne SOMENTE JSON válido, sem texto antes ou depois.
 
@@ -268,8 +278,13 @@ export default async function handler(req, res) {
   // AUTO/LTCAT/PCMSO: Claude com PDF nativo (preferencial) → Gemini fallback
   // ASO: Gemini primário → Claude fallback
   if ((tipo === 'auto' || tipo === 'ltcat' || tipo === 'pcmso') && anthropicKey) {
+    const _t0claude = Date.now()
     const claudeResult = await lerComClaude(pdfBase64Efetivo, texto_pdf, paginas, tipo, anthropicKey)
-    if (claudeResult) return res.status(200).json({ sucesso: true, ...claudeResult })
+    if (claudeResult) {
+      logIA('claude', 'claude-sonnet', 'ok', Date.now() - _t0claude, tipo)
+      return res.status(200).json({ sucesso: true, ...claudeResult })
+    }
+    logIA('claude', 'claude-sonnet', 'fallback', Date.now() - _t0claude, tipo)
     console.log(`Claude falhou para ${tipo.toUpperCase()}, tentando Gemini como fallback`)
   }
 
@@ -421,6 +436,7 @@ REGRAS CRÍTICAS:
     }
 
     for (const modelo of modelos) {
+      const _t0gem = Date.now()
       try {
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
@@ -432,13 +448,17 @@ REGRAS CRÍTICAS:
         )
         if (!response.ok) {
           const err = await response.json()
-          if ([429,503].includes(err?.error?.code)) { console.log(`${modelo}: quota/503, tentando próximo`); continue }
+          if ([429,503].includes(err?.error?.code)) {
+            logIA('gemini', modelo, 'fallback', Date.now() - _t0gem, tipo, `quota/503`)
+            console.log(`${modelo}: quota/503, tentando próximo`); continue
+          }
           throw new Error(JSON.stringify(err))
         }
         const data = await response.json()
         const texto = (data.candidates?.[0]?.content?.parts||[]).filter(p=>p.text).map(p=>p.text).join('')
         const resultado = parseRobusto(texto)
         if (resultado) {
+          logIA('gemini', modelo, 'ok', Date.now() - _t0gem, tipo)
           if (tipo === 'auto' && resultado.tipo) {
             const tipoDetectado = resultado.tipo
             const { tipo: _, ...dadosSemTipo } = resultado
@@ -446,12 +466,16 @@ REGRAS CRÍTICAS:
           }
           return res.status(200).json({ sucesso:true, dados: enriquecer(resultado, tipo), modo: usandoTexto?'texto':'imagem', modelo })
         }
-      } catch (err) { console.log(`Erro ${modelo}:`, err.message); continue }
+      } catch (err) {
+        logIA('gemini', modelo, 'erro', Date.now() - _t0gem, tipo, err.message)
+        console.log(`Erro ${modelo}:`, err.message); continue
+      }
     }
   }
 
   // ── ANTHROPIC FALLBACK ─────────────────────────────
   if (anthropicKey) {
+    const _t0haiku = Date.now()
     try {
       let content = []
       if (paginas?.length > 0) paginas.forEach(b64 => {
@@ -470,9 +494,11 @@ REGRAS CRÍTICAS:
       const data = await response.json()
       const resultado = parseRobusto(data.content?.[0]?.text || '')
       if (resultado) {
+        logIA('claude', 'claude-haiku-fallback', 'ok', Date.now() - _t0haiku, tipo)
         return res.status(200).json({ sucesso:true, dados: enriquecer(resultado, tipo), modo: usandoTexto?'texto':'imagem', modelo:'claude-fallback' })
       }
     } catch (err) {
+      logIA('claude', 'claude-haiku-fallback', 'erro', Date.now() - _t0haiku, tipo, err.message)
       return res.status(500).json({ erro:'Erro no Anthropic: ' + err.message })
     }
   }
