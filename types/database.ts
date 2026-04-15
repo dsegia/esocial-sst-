@@ -15,6 +15,13 @@ export type Database = {
           ativo: boolean
           criado_em: string
           atualizado_em: string
+          // Plano / SaaS
+          plano: 'trial' | 'starter' | 'pro' | 'business' | 'enterprise' | 'cancelado'
+          plano_expira_em: string | null
+          trial_inicio: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          max_funcionarios: number
         }
         Insert: Omit<Database['public']['Tables']['empresas']['Row'], 'id' | 'criado_em' | 'atualizado_em'>
         Update: Partial<Database['public']['Tables']['empresas']['Insert']>
@@ -162,3 +169,25 @@ export type LTCAT = Database['public']['Tables']['ltcats']['Row']
 export type CAT = Database['public']['Tables']['cats']['Row']
 export type Transmissao = Database['public']['Tables']['transmissoes']['Row']
 export type Empresa = Database['public']['Tables']['empresas']['Row']
+
+// Plano / assinatura
+export type TipoPlano = 'trial' | 'starter' | 'pro' | 'business' | 'enterprise' | 'cancelado'
+export type PlanoStatus = {
+  plano: TipoPlano
+  plano_expira_em: string | null
+  trial_ativo: boolean
+  trial_dias_restantes: number
+  max_funcionarios: number
+  qtd_funcionarios: number
+  pode_adicionar: boolean
+  tem_stripe: boolean
+}
+
+export const PLANOS: Record<string, { label: string; preco: number; max: number; cor: string }> = {
+  trial:      { label: 'Trial',     preco: 0,   max: 50,        cor: '#9ca3af' },
+  starter:    { label: 'Starter',   preco: 97,  max: 50,        cor: '#185FA5' },
+  pro:        { label: 'Pro',       preco: 197, max: 200,       cor: '#7c3aed' },
+  business:   { label: 'Business',  preco: 397, max: 500,       cor: '#0891b2' },
+  enterprise: { label: 'Enterprise',preco: 797, max: 999999,    cor: '#059669' },
+  cancelado:  { label: 'Cancelado', preco: 0,   max: 0,         cor: '#ef4444' },
+}

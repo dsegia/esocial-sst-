@@ -21,9 +21,6 @@ export default function S2220() {
   const [transmissoes, setTransmissoes] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState('todos')
-  const [editandoFunc, setEditandoFunc] = useState(null)
-  const [formEdit, setFormEdit] = useState({})
-  const [salvandoEdit, setSalvandoEdit] = useState(false)
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
 
@@ -95,22 +92,6 @@ export default function S2220() {
     if (vencido) return { label:'ASO vencido', cor:'#E24B4A', bg:'#FCEBEB', pode:true, motivo:`Vencido há ${Math.abs(dias)} dias` }
 
     return { label:'Em dia', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:'' }
-  }
-
-  async function salvarEdicaoFunc() {
-    setSalvandoEdit(true)
-    const { error } = await supabase.from('funcionarios').update({
-      nome:              formEdit.nome,
-      cpf:               formEdit.cpf,
-      data_nasc:         formEdit.data_nasc || null,
-      data_adm:          formEdit.data_adm  || null,
-      matricula_esocial: formEdit.matricula_esocial || ('PEND-' + Date.now()),
-      funcao:            formEdit.funcao || null,
-      setor:             formEdit.setor  || null,
-    }).eq('id', editandoFunc.id)
-    if (error) { setErro('Erro: ' + error.message) }
-    else { setSucesso('Funcionário atualizado!'); setEditandoFunc(null); init() }
-    setSalvandoEdit(false)
   }
 
   // Só mostra funcionários que têm ASO importado e associado
@@ -310,13 +291,6 @@ export default function S2220() {
                           Transmitir
                         </button>
                       )}
-                      <button style={s.btnAcao} onClick={() => router.push('/leitor?tipo=aso')}>
-                        {aso ? 'Novo ASO' : 'Importar ASO'}
-                      </button>
-                      <button style={{ ...s.btnAcao, color:'#374151' }}
-                        onClick={() => setEditandoFunc(f)}>
-                        ✏ Editar
-                      </button>
                     </div>
                   </td>
 
@@ -326,49 +300,6 @@ export default function S2220() {
           </tbody>
         </table>
       </div>
-      {/* Modal edição rápida de funcionário */}
-      {editandoFunc && (
-        <div style={s.overlay} onClick={() => setEditandoFunc(null)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-              <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>✏ Editar — {editandoFunc.nome}</div>
-              <button onClick={() => setEditandoFunc(null)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
-            </div>
-            {!Object.keys(formEdit).length && (() => {
-              setFormEdit({
-                nome: editandoFunc.nome||'', cpf: editandoFunc.cpf||'',
-                data_nasc: editandoFunc.data_nasc||'', data_adm: editandoFunc.data_adm||'',
-                matricula_esocial: editandoFunc.matricula_esocial?.startsWith('PEND-')?'':editandoFunc.matricula_esocial||'',
-                funcao: editandoFunc.funcao||'', setor: editandoFunc.setor||'',
-              })
-              return null
-            })()}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
-              {[
-                ['Nome completo','nome','text'],
-                ['CPF','cpf','text'],
-                ['Nascimento','data_nasc','date'],
-                ['Admissão','data_adm','date'],
-                ['Matrícula eSocial','matricula_esocial','text'],
-                ['Função / Cargo','funcao','text'],
-                ['Setor / GHE','setor','text'],
-              ].map(([label, field, type]) => (
-                <div key={field}>
-                  <label style={{ display:'block', fontSize:11, fontWeight:500, color:'#374151', marginBottom:3 }}>{label}</label>
-                  <input style={s.inputModal} type={type} value={formEdit[field]||''}
-                    onChange={e => setFormEdit(p => ({...p, [field]: e.target.value}))}/>
-                </div>
-              ))}
-            </div>
-            <div style={{ display:'flex', gap:8, marginTop:4 }}>
-              <button style={s.btnPrimary} onClick={salvarEdicaoFunc} disabled={salvandoEdit}>
-                {salvandoEdit ? 'Salvando...' : 'Salvar alterações'}
-              </button>
-              <button style={s.btnOutline} onClick={() => setEditandoFunc(null)}>Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </Layout>
   )
 }

@@ -211,7 +211,10 @@ export default function Login() {
           </form>
 
           <div style={s.rodape}>
-            Não tem conta? Crie pelo Supabase → Authentication → Add user
+            Não tem conta?{' '}
+            <a href="/cadastro" style={{ color: '#185FA5', fontWeight: 500, textDecoration: 'none' }}>
+              Criar conta grátis — trial 14 dias
+            </a>
           </div>
 
         </div>

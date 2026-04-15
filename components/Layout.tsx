@@ -25,6 +25,7 @@ const MENU = [
   { href:'/relatorios',      label:'Relatórios',              icon:'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   { href:'/alertas',         label:'Alertas',                 icon:'M12 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zM12 6v6l4 2' },
   { href:'/configuracoes',   label:'Configurações',           icon:'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z' },
+  { href:'/conta',           label:'Minha Conta',             icon:'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z' },
 ]
 
 export default function Layout({ children, pagina }) {
@@ -33,6 +34,8 @@ export default function Layout({ children, pagina }) {
   const [nomeUser, setNomeUser] = useState('')
   const [semCert, setSemCert] = useState(false)
   const [multi, setMulti] = useState(false)
+  const [plano, setPlano] = useState<string>('trial')
+  const [trialDias, setTrialDias] = useState<number>(14)
 
   useEffect(() => {
     setMulti(isMultiEmpresa())
@@ -43,10 +46,18 @@ export default function Layout({ children, pagina }) {
           if (!usuario) return
           setNomeUser(usuario.nome)
           const eId = getEmpresaId() || usuario.empresa_id
-          supabase.from('empresas').select('razao_social, cert_digital_validade')
+          supabase.from('empresas').select('razao_social, cert_digital_validade, plano, trial_inicio')
             .eq('id', eId).single()
             .then(({ data: emp }) => {
-              if (emp) { setNomeEmpresa(emp.razao_social || ''); setSemCert(!emp.cert_digital_validade) }
+              if (emp) {
+                setNomeEmpresa(emp.razao_social || '')
+                setSemCert(!emp.cert_digital_validade)
+                setPlano(emp.plano || 'trial')
+                if (emp.plano === 'trial' && emp.trial_inicio) {
+                  const dias = Math.max(0, 14 - Math.ceil((Date.now() - new Date(emp.trial_inicio).getTime()) / 86400000))
+                  setTrialDias(dias)
+                }
+              }
             })
         })
     })
@@ -135,6 +146,28 @@ export default function Layout({ children, pagina }) {
             )
           })}
         </nav>
+
+        {/* Banner trial / upgrade */}
+        {(plano === 'trial' || plano === 'cancelado') && (
+          <div style={{ padding:'0 .75rem', marginBottom:'.5rem' }}>
+            <button onClick={() => router.push('/conta')} style={{
+              width:'100%', padding:'9px 10px', borderRadius:8, border:'none', cursor:'pointer',
+              background: plano === 'cancelado' ? '#FCEBEB' : trialDias <= 3 ? '#FFF0E6' : '#E6F1FB',
+              textAlign:'left', display:'flex', alignItems:'center', gap:8,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke={plano === 'cancelado' ? '#ef4444' : trialDias <= 3 ? '#d97706' : '#185FA5'} strokeWidth="2">
+                <path d="M12 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zM12 8v4M12 16h.01"/>
+              </svg>
+              <div>
+                <div style={{ fontSize:11, fontWeight:600, color: plano === 'cancelado' ? '#ef4444' : trialDias <= 3 ? '#d97706' : '#185FA5' }}>
+                  {plano === 'cancelado' ? 'Assinatura cancelada' : `Trial: ${trialDias}d restantes`}
+                </div>
+                <div style={{ fontSize:10, color:'#6b7280' }}>Clique para ver planos</div>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Rodapé: usuário + sair */}
         <div style={{ padding:'.75rem 1.25rem 0', borderTop:'0.5px solid #e5e7eb', marginTop:'1rem', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
