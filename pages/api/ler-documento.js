@@ -88,13 +88,13 @@ ESTRUTURA TÍPICA DO DOCUMENTO:
 - Tabelas "CÓD. GHE/GF" + "NOMENCLATURA GHE/GF" → cada linha é um GHE separado
 - Coluna "FUNÇÃO" dentro de cada GHE → extraia CADA função/cargo individualmente
 - Tabela de RISCO com "Código eSocial" → agentes do GHE
-- Se risco mostrar "Ausência de agente nocivo" ou "Inexiste" → agentes = [] e aposentadoria_especial = false
+- Se o GHE indicar ausência de risco com qualquer expressão ("Inexiste", "Ausência de agente nocivo", "Não há agentes", "Sem exposição", "Não significativo", "Abaixo do LT", "ISENTO", "NÃO HÁ RISCO", "0 riscos") → agentes = [] e aposentadoria_especial = false
 - Tabela EPI / EPC no final de cada GHE → extraia equipamentos (ignora "--")
 
 REGRAS CRÍTICAS:
 1. Datas: converter DD/MM/AAAA para AAAA-MM-DD. Ex: "08/02/2022" → "2022-02-08"
 2. "funcoes": CADA cargo separado no array. Se GHE tem 5 funções, o array deve ter 5 itens
-3. "agentes": array vazio [] se o documento diz "Inexiste", "Ausência" ou similar
+3. "agentes": array vazio [] se o documento diz "Inexiste", "Ausência", "Não há", "Sem exposição", "Não significativo", "ISENTO" ou qualquer indicação de ausência de risco
 4. "aposentadoria_especial": true APENAS se o laudo confirma direito a aposentadoria especial
 5. "epi": array vazio [] se todos os EPIs são "--". Mesmo para epc
 6. "resp_conselho": "CREA" se engenheiro, "CRM" se médico do trabalho
@@ -164,7 +164,7 @@ ASO → {"tipo":"aso","funcionario":{"nome":null,"cpf":null,"data_nasc":null,"da
 
 REGRAS GERAIS:
 - Datas: converter DD/MM/AAAA → AAAA-MM-DD
-- Agentes "Inexiste"/"Ausência de agente nocivo" → agentes = []
+- Agentes: se o documento indica ausência com qualquer termo ("Inexiste", "Ausência", "Não há", "Sem exposição", "Não significativo", "ISENTO", "Abaixo do LT") → agentes = []
 - EPI "--" → epi = []
 - Retorne SOMENTE o JSON, sem texto antes ou depois`
 
@@ -253,16 +253,32 @@ export const config = { api: { bodyParser: { sizeLimit: '20mb' } } }
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
 
-  const { paginas, texto_pdf, pdf_base64, tipo } = req.body
+  const { paginas, texto_pdf, pdf_base64, pdf_signed_url, pdf_storage_path, tipo } = req.body
   const geminiKey    = process.env.GEMINI_API_KEY
   const anthropicKey = process.env.ANTHROPIC_API_KEY
 
   if (!geminiKey && !anthropicKey) return res.status(500).json({ erro: 'Nenhuma API key configurada' })
 
+  // Se veio via storage (PDF grande), baixar aqui e converter para base64
+  let pdfBase64Efetivo = pdf_base64 || null
+  if (pdf_signed_url && !pdfBase64Efetivo) {
+    try {
+      console.log('Baixando PDF do Supabase Storage...')
+      const dlResp = await fetch(pdf_signed_url)
+      if (!dlResp.ok) throw new Error(`Storage retornou ${dlResp.status}`)
+      const buffer = Buffer.from(await dlResp.arrayBuffer())
+      pdfBase64Efetivo = buffer.toString('base64')
+      console.log(`PDF baixado: ${(buffer.length / 1024 / 1024).toFixed(1)}MB`)
+    } catch (err) {
+      console.log('Falha ao baixar PDF do storage:', err.message)
+      // continua sem base64 — usará texto extraído como fallback
+    }
+  }
+
   // AUTO/LTCAT/PCMSO: Claude com PDF nativo (preferencial) → Gemini fallback
   // ASO: Gemini primário → Claude fallback
   if ((tipo === 'auto' || tipo === 'ltcat' || tipo === 'pcmso') && anthropicKey) {
-    const claudeResult = await lerComClaude(pdf_base64 || null, texto_pdf, paginas, tipo, anthropicKey)
+    const claudeResult = await lerComClaude(pdfBase64Efetivo, texto_pdf, paginas, tipo, anthropicKey)
     if (claudeResult) return res.status(200).json({ sucesso: true, ...claudeResult })
     console.log(`Claude falhou para ${tipo.toUpperCase()}, tentando Gemini como fallback`)
   }
@@ -292,7 +308,8 @@ REGRAS CRÍTICAS:
    TABELAS: se o documento tiver tabelas HTML ou estrutura de grid, extraia o conteúdo de todas as células relevantes.
 3. "setor": campo "SETOR" ou "ÁREA" do GHE quando disponível.
 4. "agentes": CADA agente de risco separado. tipo: fis=físico, qui=químico, bio=biológico, erg=ergonômico.
-5. "aposentadoria_especial": true se houver indicação de aposentadoria especial, adicional ou atividade especial.
+   Se o GHE indicar ausência de risco com qualquer expressão ("Inexiste", "Ausência", "Não há agentes", "Sem exposição", "Não significativo", "Abaixo do LT", "ISENTO", "NÃO HÁ RISCO") → agentes = [] e aposentadoria_especial = false.
+5. "aposentadoria_especial": true SOMENTE se o laudo confirmar direito a aposentadoria especial. false quando GHE não tem agentes nocivos.
 6. "epi" e "epc": liste cada equipamento individualmente com CA quando disponível.
 
 {
@@ -374,10 +391,10 @@ REGRAS CRÍTICAS:
       : ['gemini-2.5-flash','gemini-2.5-flash-lite']
 
     let parts = []
-    if (pdf_base64 && (tipo === 'auto' || tipo === 'pcmso')) {
-      // Gemini também suporta PDF inline para detecção automática e PCMSO
+    if (pdfBase64Efetivo && (tipo === 'auto' || tipo === 'pcmso' || tipo === 'ltcat')) {
+      // Gemini suporta PDF inline — usa o base64 (seja direto ou baixado do storage)
       parts = [
-        { inlineData: { mimeType: 'application/pdf', data: pdf_base64 } },
+        { inlineData: { mimeType: 'application/pdf', data: pdfBase64Efetivo } },
         { text: promptBase }
       ]
     } else if (usandoTexto) {
@@ -390,6 +407,20 @@ REGRAS CRÍTICAS:
           .replace(/FUNÇÃO DO GRUPO:/gi, '\n\n===FUNÇÕES DO GRUPO===\n')
           .replace(/NOMENCLATURA GHE\/GF/gi, '\n\n===GHE===\n')
           .replace(/DESCRIÇÃO DAS ATIVIDADES/gi, '\n\n===ATIVIDADES===\n')
+        // Converter lista de funções separadas por vírgula em itens individuais
+        textoProcessado = textoProcessado.replace(
+          /(===FUNÇÕES DO GRUPO===\n)([\s\S]*?)(?=\n\n===|\n===|$)/g,
+          (match, header, funcoes) => {
+            const linha = funcoes.trim()
+            if (!linha) return match
+            // Se já tem bullet/quebra de linha por item, mantém como está
+            if (linha.includes('\n•') || linha.includes('\n-')) return match
+            // Separa por vírgula ou ponto-e-vírgula
+            const itens = linha.split(/[,;]/).map(s => s.trim()).filter(Boolean)
+            if (itens.length <= 1) return match
+            return header + itens.map(i => `• ${i}`).join('\n') + '\n'
+          }
+        )
       }
       parts = [{ text: `${promptBase}\n\nTEXTO DO DOCUMENTO:\n${textoProcessado.substring(0,20000)}` }]
     } else if (paginas?.length > 0) {
