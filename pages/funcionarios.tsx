@@ -148,9 +148,30 @@ export default function Funcionarios() {
       if (error) { setErro('Erro ao atualizar: ' + error.message); return }
       setSucesso(`${form.nome} atualizado com sucesso!`)
     } else {
-      const { error } = await supabase.from('funcionarios').insert({ ...dados, empresa_id: empresaId })
-      if (error) { setErro(error.message.includes('unique') ? 'CPF ou matrícula já cadastrado.' : 'Erro: ' + error.message); return }
-      setSucesso(`${form.nome} cadastrado com sucesso!`)
+      // Verificar se existe registro com mesmo CPF (pode estar inativo)
+      const { data: existente } = await supabase
+        .from('funcionarios')
+        .select('id, ativo')
+        .eq('empresa_id', empresaId)
+        .eq('cpf', dados.cpf)
+        .single()
+
+      if (existente) {
+        if (!existente.ativo) {
+          // Reativar registro removido anteriormente
+          const { error } = await supabase.from('funcionarios')
+            .update({ ...dados, ativo: true }).eq('id', existente.id)
+          if (error) { setErro('Erro ao reativar: ' + error.message); return }
+          setSucesso(`${form.nome} reativado com sucesso!`)
+        } else {
+          setErro('CPF já cadastrado para outro funcionário ativo.')
+          return
+        }
+      } else {
+        const { error } = await supabase.from('funcionarios').insert({ ...dados, empresa_id: empresaId })
+        if (error) { setErro(error.message.includes('unique') ? 'CPF ou matrícula já cadastrado.' : 'Erro: ' + error.message); return }
+        setSucesso(`${form.nome} cadastrado com sucesso!`)
+      }
     }
 
     setMostrarForm(false); setFuncEditando(null); setForm(formVazio())

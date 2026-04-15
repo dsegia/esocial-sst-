@@ -163,8 +163,63 @@ export default function Importar() {
         setTimeout(() => router.push('/pcmso'), 1800)
 
       } else if (tipo_detectado === 'aso') {
-        // Para ASO: redirecionar para o leitor com dados pré-preenchidos via sessionStorage
-        sessionStorage.setItem('aso_importado', JSON.stringify({ dados, empresaId }))
+        // ASO: buscar funcionário pelo CPF ou criar novo
+        const cpfBruto = dados.funcionario?.cpf?.replace(/\D/g, '') || ''
+        let funcId = null
+
+        if (cpfBruto.length === 11) {
+          const cpfFmt = cpfBruto.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+          // Busca ativo primeiro, depois inativo
+          const { data: funcAtivo } = await supabase.from('funcionarios')
+            .select('id').eq('empresa_id', empresaId).eq('cpf', cpfFmt).eq('ativo', true).single()
+          if (funcAtivo) {
+            funcId = funcAtivo.id
+          } else {
+            const { data: funcInativo } = await supabase.from('funcionarios')
+              .select('id').eq('empresa_id', empresaId).eq('cpf', cpfFmt).single()
+            if (funcInativo) funcId = funcInativo.id
+          }
+        }
+
+        if (!funcId) {
+          const cpfFmt = cpfBruto.length === 11
+            ? cpfBruto.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+            : (dados.funcionario?.cpf || '000.000.000-00')
+          const { data: novoFunc, error: funcErr } = await supabase.from('funcionarios').insert({
+            empresa_id: empresaId,
+            nome: dados.funcionario?.nome || 'Não identificado',
+            cpf: cpfFmt,
+            data_nasc: converterData(dados.funcionario?.data_nasc),
+            data_adm: converterData(dados.funcionario?.data_adm),
+            matricula_esocial: 'PEND-' + Date.now(),
+            funcao: dados.funcionario?.funcao || null,
+            setor: dados.funcionario?.setor || null,
+            ativo: true,
+          }).select().single()
+          if (funcErr) throw new Error('Erro ao criar funcionário: ' + funcErr.message)
+          funcId = novoFunc.id
+        }
+
+        const dataExame = converterData(dados.aso?.data_exame) || new Date().toISOString().split('T')[0]
+        const { data: aso, error: asoErr } = await supabase.from('asos').insert({
+          funcionario_id: funcId, empresa_id: empresaId,
+          tipo_aso: dados.aso?.tipo_aso || 'periodico',
+          data_exame: dataExame,
+          prox_exame: converterData(dados.aso?.prox_exame) || null,
+          conclusao: dados.aso?.conclusao || 'apto',
+          medico_nome: dados.aso?.medico_nome || null,
+          medico_crm: dados.aso?.medico_crm || null,
+          exames: dados.exames || [],
+          riscos: dados.riscos || [],
+        }).select().single()
+        if (asoErr) throw new Error(asoErr.message)
+
+        await supabase.from('transmissoes').insert({
+          empresa_id: empresaId, funcionario_id: funcId,
+          evento: 'S-2220', referencia_id: aso.id, referencia_tipo: 'aso',
+          status: 'pendente', tentativas: 0, ambiente: 'producao_restrita',
+        })
+
         setEstado('pronto')
         setTimeout(() => router.push('/aso'), 1800)
       }
@@ -358,6 +413,13 @@ export default function Importar() {
       </div>
     </Layout>
   )
+}
+
+function converterData(br) {
+  if (!br) return null
+  if (typeof br === 'string' && br.includes('-') && !br.includes('/')) return br.substring(0,10)
+  const p = String(br).split('/')
+  return p.length === 3 ? `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}` : null
 }
 
 function Campo({ label, valor }) {
