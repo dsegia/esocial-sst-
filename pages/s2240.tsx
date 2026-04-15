@@ -5,6 +5,41 @@ import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
 
+// Tabela 27 eSocial — exames
+const EXAMES_ESOCIAL = [
+  { codigo: '001', nome: 'Acuidade visual' },
+  { codigo: '002', nome: 'Audiometria tonal e vocal' },
+  { codigo: '003', nome: 'Eletrocardiograma (ECG)' },
+  { codigo: '004', nome: 'Eletroencefalograma (EEG)' },
+  { codigo: '005', nome: 'Espirometria' },
+  { codigo: '006', nome: 'Exame clínico' },
+  { codigo: '007', nome: 'Hemograma completo' },
+  { codigo: '008', nome: 'Glicemia em jejum' },
+  { codigo: '009', nome: 'Colesterol total e frações' },
+  { codigo: '010', nome: 'Triglicerídeos' },
+  { codigo: '011', nome: 'Ureia' },
+  { codigo: '012', nome: 'Creatinina' },
+  { codigo: '013', nome: 'Transaminases (TGO/TGP)' },
+  { codigo: '014', nome: 'Gama-GT' },
+  { codigo: '018', nome: 'Urina tipo I (EAS)' },
+  { codigo: '020', nome: 'Radiografia de tórax' },
+  { codigo: '021', nome: 'Avaliação psicológica' },
+  { codigo: '031', nome: 'Chumbo no sangue (plumbemia)' },
+  { codigo: '032', nome: 'Mercúrio na urina' },
+  { codigo: '033', nome: 'Benzeno no sangue' },
+  { codigo: '034', nome: 'Colinesterase eritrocitária' },
+  { codigo: '099', nome: 'Outros' },
+]
+
+function codigoDeExame(nome: string): string {
+  const n = nome.toLowerCase()
+  const match = EXAMES_ESOCIAL.find(e =>
+    n.includes(e.nome.toLowerCase().split(' ')[0]) ||
+    e.nome.toLowerCase().includes(n.split(' ')[0])
+  )
+  return match?.codigo || '099'
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -29,6 +64,13 @@ export default function S2240() {
   const [formEdit, setFormEdit] = useState({})
   const [salvandoEdit, setSalvandoEdit] = useState(false)
   const [gheSelecionado, setGheSelecionado] = useState('')
+  // Exames no modal de edição
+  const [abaModal, setAbaModal] = useState<'dados'|'exames'>('dados')
+  const [asoDoFunc, setAsoDoFunc] = useState<any>(null)
+  const [formExames, setFormExames] = useState<any[]>([])
+  const [novoExameCodigo, setNovoExameCodigo] = useState(EXAMES_ESOCIAL[0].codigo)
+  const [novoExameResultado, setNovoExameResultado] = useState<'Normal'|'Alterado'|'Pendente'>('Normal')
+  const [asos, setAsos] = useState<any[]>([])
 
   useEffect(() => { init() }, [])
 
@@ -40,20 +82,73 @@ export default function S2240() {
     const empId = getEmpresaId() || user.empresa_id
     setEmpresaId(empId)
 
-    const [funcsRes, ltcatRes, txRes] = await Promise.all([
+    const [funcsRes, ltcatRes, txRes, asosRes] = await Promise.all([
       supabase.from('funcionarios').select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc,ghe_id').eq('empresa_id', empId).eq('ativo', true).order('nome'),
       supabase.from('ltcats').select('*').eq('empresa_id', empId).eq('ativo', true).order('data_emissao', { ascending: false }).limit(1).single(),
       supabase.from('transmissoes').select('id,status,evento,funcionario_id,recibo,dt_envio,criado_em,erro_descricao').eq('empresa_id', empId).eq('evento', 'S-2240').order('criado_em', { ascending: false }),
+      supabase.from('asos').select('id,funcionario_id,tipo_aso,data_exame,exames').eq('empresa_id', empId).order('data_exame', { ascending: false }),
     ])
 
     setFuncionarios(funcsRes.data || [])
     setLtcatAtivo(ltcatRes.data || null)
     setTransmissoes(txRes.data || [])
+    setAsos(asosRes.data || [])
     setCarregando(false)
   }
 
   function ultimaTx(funcId) {
     return transmissoes.filter(t => t.funcionario_id === funcId)[0] || null
+  }
+
+  function ultimoAsoFunc(funcId) {
+    return asos.filter(a => a.funcionario_id === funcId)
+      .sort((a, b) => new Date(b.data_exame).getTime() - new Date(a.data_exame).getTime())[0] || null
+  }
+
+  function abrirEditar(f: any) {
+    const aso = ultimoAsoFunc(f.id)
+    setAsoDoFunc(aso)
+    const exames = (aso?.exames || []).map((e: any) => ({
+      ...e,
+      codigo: e.codigo || codigoDeExame(e.nome),
+    }))
+    setFormExames(exames)
+    setNovoExameCodigo(EXAMES_ESOCIAL[0].codigo)
+    setNovoExameResultado('Normal')
+    setAbaModal('dados')
+    setFormEdit({
+      nome: f.nome || '', cpf: f.cpf || '',
+      data_nasc: f.data_nasc || '', data_adm: f.data_adm || '',
+      matricula_esocial: f.matricula_esocial?.startsWith('PEND-') ? '' : (f.matricula_esocial || ''),
+      funcao: f.funcao || '', setor: f.setor || '',
+    })
+    setEditandoFunc(f)
+    setSucesso(''); setErro('')
+  }
+
+  async function salvarExames() {
+    if (!asoDoFunc) return
+    setSalvandoEdit(true)
+    const { error } = await supabase.from('asos').update({ exames: formExames }).eq('id', asoDoFunc.id)
+    if (error) setErro('Erro ao salvar exames: ' + error.message)
+    else { setSucesso('Exames atualizados!'); await init() }
+    setSalvandoEdit(false)
+  }
+
+  function adicionarExame() {
+    const item = EXAMES_ESOCIAL.find(e => e.codigo === novoExameCodigo)
+    if (!item) return
+    if (formExames.some(e => e.codigo === novoExameCodigo)) { setErro('Exame já adicionado.'); return }
+    setFormExames(prev => [...prev, { codigo: item.codigo, nome: item.nome, resultado: novoExameResultado }])
+    setErro('')
+  }
+
+  function removerExame(idx: number) {
+    setFormExames(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function atualizarResultado(idx: number, resultado: string) {
+    setFormExames(prev => prev.map((e, i) => i === idx ? { ...e, resultado } : e))
   }
 
   function gheDoFuncionario(func) {
@@ -354,20 +449,28 @@ export default function S2240() {
                     )}
                   </td>
                   <td style={s.td}>
-                    {ghe?.agentes?.length ? (
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-                        {ghe.agentes.slice(0,3).map((ag,i) => {
-                          const COR = { fis:'#E6F1FB', qui:'#FAEEDA', bio:'#EAF3DE', erg:'#FCEBEB' }
-                          const TXT = { fis:'#0C447C', qui:'#633806', bio:'#27500A', erg:'#791F1F' }
-                          return (
-                            <span key={i} style={{ padding:'1px 6px', borderRadius:99, fontSize:10, fontWeight:500, background:COR[ag.tipo]||'#f3f4f6', color:TXT[ag.tipo]||'#374151' }}>
-                              {ag.nome?.substring(0,20)}{ag.nome?.length>20?'...':''}
+                    {(() => {
+                      const agentes = ghe?.agentes || []
+                      if (!ghe) return <span style={{ fontSize:11, color:'#9ca3af' }}>Vincule um GHE</span>
+                      if (agentes.length === 0) return <span style={{ fontSize:11, color:'#EF9F27' }}>GHE sem agentes cadastrados</span>
+                      const COR: any = { fis:'#E6F1FB', qui:'#FAEEDA', bio:'#EAF3DE', erg:'#FCEBEB' }
+                      const TXT: any = { fis:'#0C447C', qui:'#633806', bio:'#27500A', erg:'#791F1F' }
+                      const TIPO: any = { fis:'Físico', qui:'Químico', bio:'Biológico', erg:'Ergonômico' }
+                      return (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                          {agentes.slice(0,3).map((ag: any, i: number) => (
+                            <span key={i} title={`${TIPO[ag.tipo]||ag.tipo} — ${ag.nome}`}
+                              style={{ padding:'1px 6px', borderRadius:99, fontSize:10, fontWeight:500,
+                                background: COR[ag.tipo]||'#f3f4f6', color: TXT[ag.tipo]||'#374151' }}>
+                              {ag.nome?.substring(0,18)}{ag.nome?.length > 18 ? '…' : ''}
                             </span>
-                          )
-                        })}
-                        {ghe.agentes.length > 3 && <span style={{ fontSize:10, color:'#9ca3af' }}>+{ghe.agentes.length-3}</span>}
-                      </div>
-                    ) : <span style={{ fontSize:11, color:'#9ca3af' }}>—</span>}
+                          ))}
+                          {agentes.length > 3 && (
+                            <span style={{ fontSize:10, color:'#9ca3af' }}>+{agentes.length-3}</span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td style={s.td}>
                     {tx ? (
@@ -415,15 +518,7 @@ export default function S2240() {
                       )}
                       {/* Editar funcionário */}
                       <button style={{ ...s.btnAcao, color:'#374151' }}
-                        onClick={() => {
-                          setFormEdit({
-                            nome: f.nome||'', cpf: f.cpf||'',
-                            data_nasc: f.data_nasc||'', data_adm: f.data_adm||'',
-                            matricula_esocial: f.matricula_esocial?.startsWith('PEND-')?'':f.matricula_esocial||'',
-                            funcao: f.funcao||'', setor: f.setor||'',
-                          })
-                          setEditandoFunc(f)
-                        }}>
+                        onClick={() => abrirEditar(f)}>
                         ✏ Editar
                       </button>
                       {/* Excluir — sempre visível */}
@@ -485,38 +580,168 @@ export default function S2240() {
         </div>
       )}
 
-      {/* Modal edição rápida */}
+      {/* Modal edição — dados + exames */}
       {editandoFunc && (
         <div style={s.overlay} onClick={() => setEditandoFunc(null)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
+          <div style={{ ...s.modal, width:580 }} onClick={e => e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-              <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>✏ Editar — {editandoFunc.nome}</div>
+              <div>
+                <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>✏ Editar — {editandoFunc.nome}</div>
+                {asoDoFunc && (
+                  <div style={{ fontSize:11, color:'#9ca3af' }}>
+                    Último ASO: {asoDoFunc.tipo_aso} · {new Date(asoDoFunc.data_exame+'T12:00').toLocaleDateString('pt-BR')}
+                  </div>
+                )}
+              </div>
               <button onClick={() => setEditandoFunc(null)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#9ca3af' }}>×</button>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
-              {[
-                ['Nome completo','nome','text'],
-                ['CPF','cpf','text'],
-                ['Nascimento','data_nasc','date'],
-                ['Admissão','data_adm','date'],
-                ['Matrícula eSocial','matricula_esocial','text'],
-                ['Função / Cargo','funcao','text'],
-                ['Setor / GHE','setor','text'],
-              ].map(([label, field, type]) => (
-                <div key={field}>
-                  <label style={{ display:'block', fontSize:11, fontWeight:500, color:'#374151', marginBottom:3 }}>{label}</label>
-                  <input style={s.inputModal} type={type} value={formEdit[field]||''}
-                    onChange={e => setFormEdit(p => ({...p, [field]: e.target.value}))}/>
-                </div>
+            {sucesso && <div style={{ background:'#EAF3DE', color:'#27500A', border:'0.5px solid #C0DD97', borderRadius:8, padding:'9px 12px', fontSize:12, marginBottom:12 }}>{sucesso}</div>}
+            {erro    && <div style={{ background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'9px 12px', fontSize:12, marginBottom:12 }}>{erro}</div>}
+
+            {/* Abas */}
+            <div style={{ display:'flex', borderBottom:'0.5px solid #e5e7eb', marginBottom:16 }}>
+              {(['dados', 'exames'] as const).map(aba => (
+                <button key={aba} onClick={() => { setAbaModal(aba); setSucesso(''); setErro('') }}
+                  style={{ padding:'7px 16px', fontSize:12, fontWeight:600, border:'none', cursor:'pointer',
+                    background:'transparent',
+                    color: abaModal === aba ? '#185FA5' : '#9ca3af',
+                    borderBottom: abaModal === aba ? '2px solid #185FA5' : '2px solid transparent',
+                    marginBottom: -1,
+                  }}>
+                  {aba === 'dados' ? 'Dados do Funcionário' : `Exames do ASO (${formExames.length})`}
+                </button>
               ))}
             </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <button style={s.btnPrimary} onClick={salvarEdicaoFunc} disabled={salvandoEdit}>
-                {salvandoEdit ? 'Salvando...' : 'Salvar alterações'}
-              </button>
-              <button style={s.btnOutline} onClick={() => setEditandoFunc(null)}>Cancelar</button>
-            </div>
+
+            {/* Aba dados */}
+            {abaModal === 'dados' && (
+              <>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
+                  {([
+                    ['Nome completo','nome','text'],
+                    ['CPF','cpf','text'],
+                    ['Nascimento','data_nasc','date'],
+                    ['Admissão','data_adm','date'],
+                    ['Matrícula eSocial','matricula_esocial','text'],
+                    ['Função / Cargo','funcao','text'],
+                    ['Setor / GHE','setor','text'],
+                  ] as [string,string,string][]).map(([label, field, type]) => (
+                    <div key={field}>
+                      <label style={s.label}>{label}</label>
+                      <input style={s.input} type={type} value={formEdit[field]||''}
+                        onChange={e => setFormEdit((p:any) => ({...p, [field]: e.target.value}))}/>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button style={s.btnPrimary} onClick={salvarEdicaoFunc} disabled={salvandoEdit}>
+                    {salvandoEdit ? 'Salvando...' : 'Salvar dados'}
+                  </button>
+                  <button style={s.btnOutline} onClick={() => setEditandoFunc(null)}>Fechar</button>
+                </div>
+              </>
+            )}
+
+            {/* Aba exames */}
+            {abaModal === 'exames' && (
+              <>
+                {!asoDoFunc ? (
+                  <div style={{ textAlign:'center', padding:'2rem', color:'#9ca3af', fontSize:12, background:'#f9fafb', borderRadius:8, marginBottom:14 }}>
+                    Este funcionário não tem ASO cadastrado.<br/>
+                    <a href="/leitor?tipo=aso" style={{ color:'#185FA5' }}>Importar ASO</a>
+                  </div>
+                ) : (
+                  <>
+                    {/* Lista de exames */}
+                    <div style={{ marginBottom:14 }}>
+                      {formExames.length === 0 ? (
+                        <div style={{ textAlign:'center', padding:'1.5rem', color:'#9ca3af', fontSize:12, background:'#f9fafb', borderRadius:8 }}>
+                          Nenhum exame no ASO. Adicione abaixo.
+                        </div>
+                      ) : (
+                        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                          <thead>
+                            <tr style={{ background:'#f9fafb' }}>
+                              <th style={s.th}>Cód. eSocial</th>
+                              <th style={s.th}>Exame</th>
+                              <th style={s.th}>Resultado</th>
+                              <th style={s.th}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {formExames.map((ex: any, idx: number) => (
+                              <tr key={idx} style={{ borderBottom:'0.5px solid #f3f4f6' }}>
+                                <td style={{ ...s.td, fontFamily:'monospace', fontWeight:600, color:'#185FA5' }}>
+                                  {ex.codigo || codigoDeExame(ex.nome)}
+                                </td>
+                                <td style={s.td}>{ex.nome}</td>
+                                <td style={s.td}>
+                                  <select value={ex.resultado}
+                                    onChange={e => atualizarResultado(idx, e.target.value)}
+                                    style={{ padding:'3px 6px', fontSize:11, border:'0.5px solid #d1d5db', borderRadius:5,
+                                      background: ex.resultado === 'Normal' ? '#EAF3DE' : ex.resultado === 'Alterado' ? '#FCEBEB' : '#FAEEDA',
+                                      color: ex.resultado === 'Normal' ? '#27500A' : ex.resultado === 'Alterado' ? '#791F1F' : '#633806',
+                                      fontWeight:600, cursor:'pointer',
+                                    }}>
+                                    <option value="Normal">Normal</option>
+                                    <option value="Alterado">Alterado</option>
+                                    <option value="Pendente">Pendente</option>
+                                  </select>
+                                </td>
+                                <td style={s.td}>
+                                  <button onClick={() => removerExame(idx)}
+                                    style={{ padding:'3px 8px', fontSize:10, background:'transparent', border:'0.5px solid #F09595', borderRadius:5, cursor:'pointer', color:'#E24B4A' }}>
+                                    Remover
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    {/* Adicionar */}
+                    <div style={{ background:'#f9fafb', border:'0.5px solid #e5e7eb', borderRadius:8, padding:'12px 14px', marginBottom:14 }}>
+                      <div style={{ fontSize:11, fontWeight:600, color:'#374151', marginBottom:8 }}>Adicionar exame</div>
+                      <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
+                        <div style={{ flex:1 }}>
+                          <label style={s.label}>Exame (Tabela 27)</label>
+                          <select style={s.input} value={novoExameCodigo}
+                            onChange={e => setNovoExameCodigo(e.target.value)}>
+                            {EXAMES_ESOCIAL.map(e => (
+                              <option key={e.codigo} value={e.codigo}>{e.codigo} — {e.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ width:120 }}>
+                          <label style={s.label}>Resultado</label>
+                          <select style={s.input} value={novoExameResultado}
+                            onChange={e => setNovoExameResultado(e.target.value as any)}>
+                            <option value="Normal">Normal</option>
+                            <option value="Alterado">Alterado</option>
+                            <option value="Pendente">Pendente</option>
+                          </select>
+                        </div>
+                        <button onClick={adicionarExame}
+                          style={{ ...s.btnPrimary, padding:'8px 12px', whiteSpace:'nowrap' }}>
+                          + Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+                <div style={{ display:'flex', gap:8 }}>
+                  {asoDoFunc && (
+                    <button style={s.btnPrimary} onClick={salvarExames} disabled={salvandoEdit}>
+                      {salvandoEdit ? 'Salvando...' : 'Salvar exames'}
+                    </button>
+                  )}
+                  <button style={s.btnOutline} onClick={() => setEditandoFunc(null)}>Fechar</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -531,13 +756,13 @@ const s = {
   sub:        { fontSize:12, color:'#6b7280', marginTop:2 },
   th:         { padding:'10px 12px', textAlign:'left', fontSize:11, fontWeight:600, color:'#6b7280', borderBottom:'0.5px solid #e5e7eb', textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' },
   td:         { padding:'10px 12px', verticalAlign:'top', color:'#374151' },
-  label:      { display:'block', fontSize:12, fontWeight:500, color:'#374151', marginBottom:4 },
-  input:      { width:'100%', padding:'8px 10px', fontSize:13, border:'1px solid #d1d5db', borderRadius:8, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' },
+  label:      { display:'block', fontSize:11, fontWeight:500, color:'#374151', marginBottom:3 },
+  input:      { width:'100%', padding:'7px 9px', fontSize:12, border:'1px solid #d1d5db', borderRadius:7, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' },
   btnAcao:    { padding:'3px 10px', fontSize:11, background:'transparent', border:'0.5px solid #d1d5db', borderRadius:6, cursor:'pointer', color:'#374151', whiteSpace:'nowrap' },
   btnPrimary: { padding:'8px 16px', background:'#185FA5', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' },
   btnOutline: { padding:'8px 14px', background:'transparent', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, cursor:'pointer', color:'#374151' },
   erroBox:    { background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12 },
   sucessoBox: { background:'#EAF3DE', color:'#27500A', border:'0.5px solid #C0DD97', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:12 },
   overlay:    { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 },
-  modal:      { background:'#fff', borderRadius:12, padding:'1.5rem', width:480, boxShadow:'0 20px 60px rgba(0,0,0,0.15)' },
+  modal:      { background:'#fff', borderRadius:12, padding:'1.5rem', width:480, maxHeight:'92vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.15)' },
 }
