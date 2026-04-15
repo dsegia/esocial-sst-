@@ -248,7 +248,7 @@ async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) 
 }
 
 // ────────────────────────────────────────────────────────
-export const config = { api: { bodyParser: { sizeLimit: '20mb' } } }
+export const config = { api: { bodyParser: { sizeLimit: '20mb' } }, maxDuration: 60 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })

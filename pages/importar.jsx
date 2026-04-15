@@ -45,9 +45,30 @@ export default function Importar() {
     setResultado(null)
 
     try {
-      setProgresso('Enviando PDF para análise...')
+      // 1) Extrair texto com PDF.js (fallback garantido)
+      setProgresso('Analisando PDF...')
+      let textoPdf = ''
+      try {
+        if (!window.pdfjsLib) {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script')
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+            s.onload = resolve; s.onerror = reject
+            document.head.appendChild(s)
+          })
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+        }
+        const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise
+        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+          const page = await pdf.getPage(i)
+          const content = await page.getTextContent()
+          textoPdf += content.items.map(it => it.str).join(' ') + '\n'
+        }
+      } catch { /* ignora erro de extração — segue com texto vazio */ }
 
-      // Upload direto para Supabase Storage — evita limite de 4.5MB do Vercel
+      // 2) Upload para Supabase Storage (sem passar pelo Vercel)
+      setProgresso('Enviando PDF para análise...')
       const storagePath = `temp/${empresaId || 'anon'}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`
       const { error: uploadErr } = await supabase.storage
         .from('documentos-temp')
@@ -63,7 +84,7 @@ export default function Importar() {
       const resp = await fetch('/api/ler-documento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdf_signed_url: signedData.signedUrl, texto_pdf: '', paginas: [], tipo: 'auto' })
+        body: JSON.stringify({ pdf_signed_url: signedData.signedUrl, texto_pdf: textoPdf, paginas: [], tipo: 'auto' })
       })
       let json
       try { json = await resp.json() }
