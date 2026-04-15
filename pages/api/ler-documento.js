@@ -397,6 +397,20 @@ REGRAS CRÍTICAS:
           .replace(/FUNÇÃO DO GRUPO:/gi, '\n\n===FUNÇÕES DO GRUPO===\n')
           .replace(/NOMENCLATURA GHE\/GF/gi, '\n\n===GHE===\n')
           .replace(/DESCRIÇÃO DAS ATIVIDADES/gi, '\n\n===ATIVIDADES===\n')
+        // Converter lista de funções separadas por vírgula em itens individuais
+        textoProcessado = textoProcessado.replace(
+          /(===FUNÇÕES DO GRUPO===\n)([\s\S]*?)(?=\n\n===|\n===|$)/g,
+          (match, header, funcoes) => {
+            const linha = funcoes.trim()
+            if (!linha) return match
+            // Se já tem bullet/quebra de linha por item, mantém como está
+            if (linha.includes('\n•') || linha.includes('\n-')) return match
+            // Separa por vírgula ou ponto-e-vírgula
+            const itens = linha.split(/[,;]/).map(s => s.trim()).filter(Boolean)
+            if (itens.length <= 1) return match
+            return header + itens.map(i => `• ${i}`).join('\n') + '\n'
+          }
+        )
       }
       parts = [{ text: `${promptBase}\n\nTEXTO DO DOCUMENTO:\n${textoProcessado.substring(0,20000)}` }]
     } else if (paginas?.length > 0) {
