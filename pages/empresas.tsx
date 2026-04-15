@@ -37,6 +37,7 @@ export default function Empresas() {
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
+  const [busca, setBusca] = useState('')
 
   useEffect(() => { init() }, [])
 
@@ -176,6 +177,19 @@ export default function Empresas() {
       {sucesso && <div style={{ background:'#EAF3DE', color:'#27500A', border:'0.5px solid #C0DD97', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:14 }}>{sucesso}</div>}
       {erro    && <div style={{ background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'10px 14px', fontSize:13, marginBottom:14 }}>{erro}</div>}
 
+      {/* Campo de busca — aparece só quando há 5+ empresas */}
+      {empresas.length >= 5 && (
+        <div style={{ marginBottom:14 }}>
+          <input
+            type="text"
+            placeholder="Buscar por nome ou CNPJ..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1px solid #d1d5db', borderRadius:8, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' }}
+          />
+        </div>
+      )}
+
       {/* Formulário nova empresa */}
       {mostrarForm && (
         <div style={{ background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, padding:'1.25rem', marginBottom:'1rem' }}>
@@ -244,7 +258,18 @@ export default function Empresas() {
           <div style={{ background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, padding:'3rem', textAlign:'center', color:'#9ca3af', fontSize:13 }}>
             Nenhuma empresa vinculada.
           </div>
-        ) : empresas.map(emp => {
+        ) : (() => {
+          const filtradas = empresas.filter(emp => {
+            if (!busca.trim()) return true
+            const t = busca.toLowerCase()
+            return emp.razao_social.toLowerCase().includes(t) || emp.cnpj.replace(/\D/g,'').includes(busca.replace(/\D/g,''))
+          })
+          if (filtradas.length === 0) return (
+            <div style={{ background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, padding:'3rem', textAlign:'center', color:'#9ca3af', fontSize:13 }}>
+              Nenhuma empresa encontrada para "{busca}".
+            </div>
+          )
+          return filtradas.map(emp => {
           const ativa = emp.id === empresaAtualId
           const dias = diasParaVencer(emp.cert_digital_validade)
           const certOk = dias !== null && dias > 30
@@ -328,7 +353,8 @@ export default function Empresas() {
               </div>
             </div>
           )
-        })}
+          })
+        })()}
       </div>
     </Layout>
   )
