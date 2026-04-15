@@ -167,29 +167,25 @@ export default function Leitor() {
       const tipoLabel = tipo === 'ltcat' ? 'LTCAT' : tipo === 'pcmso' ? 'PCMSO' : 'ASO'
       setProgresso(`${tipoLabel} identificado. Enviando para IA...`)
 
+      // ── 3 níveis de envio ────────────────────────────────────
+      // Nível 1: PDF pequeno (≤3 MB) → base64 → Claude nativo (máxima precisão)
+      // Nível 2: PDF grande com texto → texto extraído → Claude via prompt
+      // Nível 3: PDF grande escaneado → imagens JPEG → Claude visual
+      const LIMITE = 3 * 1024 * 1024
       let payload
-      // PDFs de LTCAT/PCMSO: envia via Supabase Storage para contornar limite de 4.5MB do Vercel
-      if (tipo === 'ltcat' || tipo === 'pcmso') {
-        setProgresso('Enviando PDF para análise com Claude nativo...')
-        const storagePath = `temp/${empresaId}/${Date.now()}_${arquivo.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`
-        const { error: uploadErr } = await supabase.storage
-          .from('documentos-temp')
-          .upload(storagePath, arquivo, { contentType: 'application/pdf', upsert: true })
-        if (uploadErr) throw new Error('Erro no upload: ' + uploadErr.message)
 
-        const { data: signedData, error: signErr } = await supabase.storage
-          .from('documentos-temp')
-          .createSignedUrl(storagePath, 300)
-        if (signErr) throw new Error('Erro ao gerar URL: ' + signErr.message)
+      if (arquivo.size <= LIMITE) {
+        setProgresso('Preparando leitura nativa com Claude...')
+        const pdf_base64 = await pdfParaBase64(arquivo)
+        payload = { pdf_base64, texto_pdf: texto, paginas: [], tipo }
 
-        setProgresso('PDF enviado. Analisando com IA...')
-        payload = { pdf_signed_url: signedData.signedUrl, pdf_storage_path: storagePath, texto_pdf: texto, paginas: [], tipo }
       } else if (temTexto) {
+        setProgresso(`PDF grande (${(arquivo.size/1024/1024).toFixed(1)} MB) — usando texto extraído...`)
         payload = { texto_pdf: texto, paginas: [], tipo }
+
       } else {
-        setProgresso('PDF escaneado. Convertendo em imagens...')
+        setProgresso('PDF escaneado — convertendo páginas em imagens...')
         const paginas = await pdfParaImagens(arquivo)
-        setProgresso('Analisando com IA...')
         payload = { paginas, texto_pdf: '', tipo }
       }
 

@@ -45,50 +45,73 @@ export default function Importar() {
     setResultado(null)
 
     try {
-      // 1) Extrair texto com PDF.js (fallback garantido)
+      // ── Carrega PDF.js ──────────────────────────────────────
       setProgresso('Analisando PDF...')
+      if (!window.pdfjsLib) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+          s.onload = resolve; s.onerror = reject
+          document.head.appendChild(s)
+        })
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+      }
+      const lib = window.pdfjsLib
+      const arrayBuf = await file.arrayBuffer()
+      const pdfDoc = await lib.getDocument({ data: arrayBuf.slice(0) }).promise
+
+      // ── Extrai texto (páginas 1–10) ──────────────────────────
       let textoPdf = ''
-      try {
-        if (!window.pdfjsLib) {
-          await new Promise((resolve, reject) => {
-            const s = document.createElement('script')
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-            s.onload = resolve; s.onerror = reject
-            document.head.appendChild(s)
-          })
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-        }
-        const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise
-        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-          const page = await pdf.getPage(i)
-          const content = await page.getTextContent()
-          textoPdf += content.items.map(it => it.str).join(' ') + '\n'
-        }
-      } catch { /* ignora erro de extração — segue com texto vazio */ }
+      for (let i = 1; i <= Math.min(pdfDoc.numPages, 10); i++) {
+        const page = await pdfDoc.getPage(i)
+        const content = await page.getTextContent()
+        textoPdf += content.items.map(it => it.str).join(' ') + '\n'
+      }
+      const temTexto = textoPdf.replace(/\s/g, '').length > 300
 
-      // 2) Upload para Supabase Storage (sem passar pelo Vercel)
-      setProgresso('Enviando PDF para análise...')
-      const storagePath = `temp/${empresaId || 'anon'}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`
-      const { error: uploadErr } = await supabase.storage
-        .from('documentos-temp')
-        .upload(storagePath, file, { contentType: 'application/pdf', upsert: true })
-      if (uploadErr) throw new Error('Erro no upload: ' + uploadErr.message)
+      // ── Monta payload pelos 3 níveis ─────────────────────────
+      // Nível 1: PDF pequeno (≤3 MB) → base64 → Claude nativo (máxima precisão)
+      // Nível 2: PDF grande com texto → texto extraído → Claude via prompt
+      // Nível 3: PDF grande escaneado → imagens JPEG → Claude visual
+      const LIMITE = 3 * 1024 * 1024
+      let payload
 
-      const { data: signedData, error: signErr } = await supabase.storage
-        .from('documentos-temp')
-        .createSignedUrl(storagePath, 300)
-      if (signErr) throw new Error('Erro ao gerar URL temporária: ' + signErr.message)
+      if (file.size <= LIMITE) {
+        setProgresso('Preparando PDF para leitura nativa...')
+        const bytes = new Uint8Array(arrayBuf.slice(0))
+        let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+        const pdf_base64 = btoa(bin)
+        payload = { pdf_base64, texto_pdf: textoPdf, paginas: [], tipo: 'auto' }
+
+      } else if (temTexto) {
+        setProgresso(`PDF grande (${(file.size/1024/1024).toFixed(1)} MB) — usando texto extraído...`)
+        payload = { texto_pdf: textoPdf, paginas: [], tipo: 'auto' }
+
+      } else {
+        setProgresso('PDF escaneado — convertendo páginas em imagens...')
+        const paginas = []
+        for (let i = 1; i <= Math.min(pdfDoc.numPages, 5); i++) {
+          setProgresso(`Convertendo página ${i} de ${Math.min(pdfDoc.numPages, 5)}...`)
+          const page = await pdfDoc.getPage(i)
+          const vp = page.getViewport({ scale: 1.5 })
+          const canvas = document.createElement('canvas')
+          canvas.width = vp.width; canvas.height = vp.height
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
+          paginas.push(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+        }
+        payload = { paginas, texto_pdf: '', tipo: 'auto' }
+      }
 
       setProgresso('Identificando tipo do documento com IA...')
       const resp = await fetch('/api/ler-documento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdf_signed_url: signedData.signedUrl, texto_pdf: textoPdf, paginas: [], tipo: 'auto' })
+        body: JSON.stringify(payload)
       })
       let json
       try { json = await resp.json() }
-      catch { throw new Error('O servidor não respondeu. Tente novamente.') }
+      catch { throw new Error('O servidor não respondeu. Tente novamente em instantes.') }
       if (!resp.ok || !json.sucesso) throw new Error(json.erro || 'Erro na análise do documento')
 
       setResultado(json)

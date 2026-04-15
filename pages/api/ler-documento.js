@@ -253,33 +253,17 @@ export const config = { api: { bodyParser: { sizeLimit: '20mb' } }, maxDuration:
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
 
-  const { paginas, texto_pdf, pdf_base64, pdf_signed_url, tipo } = req.body
+  const { paginas, texto_pdf, pdf_base64, tipo } = req.body
   const geminiKey    = process.env.GEMINI_API_KEY
   const anthropicKey = process.env.ANTHROPIC_API_KEY
 
   if (!geminiKey && !anthropicKey) return res.status(500).json({ erro: 'Nenhuma API key configurada' })
 
-  // PDF via Supabase Storage: só baixa se não tiver texto extraído suficiente
-  // (PDFs com texto → usa texto diretamente, muito mais rápido)
-  // (PDFs escaneados → precisa do base64 para leitura visual)
-  const temTextoSuficiente = texto_pdf && texto_pdf.replace(/\s/g, '').length > 500
-  let pdfBase64Efetivo = pdf_base64 || null
-
-  if (pdf_signed_url && !pdfBase64Efetivo && !temTextoSuficiente) {
-    // PDF escaneado sem texto: baixar do storage para leitura nativa
-    try {
-      console.log('PDF escaneado — baixando do Supabase Storage...')
-      const dlResp = await fetch(pdf_signed_url)
-      if (!dlResp.ok) throw new Error(`Storage retornou ${dlResp.status}`)
-      const buffer = Buffer.from(await dlResp.arrayBuffer())
-      pdfBase64Efetivo = buffer.toString('base64')
-      console.log(`PDF baixado: ${(buffer.length / 1024 / 1024).toFixed(1)}MB`)
-    } catch (err) {
-      console.log('Falha ao baixar PDF do storage:', err.message)
-    }
-  } else if (pdf_signed_url && temTextoSuficiente) {
-    console.log(`PDF com texto extraído (${texto_pdf.replace(/\s/g,'').length} chars) — usando texto, sem download`)
-  }
+  // 3 níveis já resolvidos no cliente:
+  // - pdf_base64 preenchido  → PDF pequeno, leitura nativa (máxima precisão)
+  // - texto_pdf preenchido   → PDF grande com texto, modo prompt
+  // - paginas preenchido     → PDF escaneado, modo imagem
+  const pdfBase64Efetivo = pdf_base64 || null
 
   // AUTO/LTCAT/PCMSO: Claude com PDF nativo (preferencial) → Gemini fallback
   // ASO: Gemini primário → Claude fallback
