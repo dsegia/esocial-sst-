@@ -446,9 +446,9 @@ export default function S2240() {
                       const agentes = ghe?.agentes || []
                       if (!ghe) return <span style={{ fontSize:11, color:'#9ca3af' }}>Vincule um GHE</span>
                       if (agentes.length === 0) return (
-                        <span title="Sem exposição a agentes nocivos — eSocial: ausência de agente nocivo (omitir <agNocivo>)"
-                          style={{ padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:600, background:'#EAF3DE', color:'#27500A', display:'inline-block' }}>
-                          Sem agentes nocivos
+                        <span title="09.01.001 — Ausência de agente nocivo ou de atividades previstas no Anexo IV do Decreto 3.048/1999"
+                          style={{ padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:600, background:'#EAF3DE', color:'#27500A', display:'inline-block', cursor:'default' }}>
+                          09.01.001 · Sem agente nocivo
                         </span>
                       )
                       const COR: any = { fis:'#E6F1FB', qui:'#FAEEDA', bio:'#EAF3DE', erg:'#FCEBEB' }
@@ -673,18 +673,21 @@ export default function S2240() {
 
                   {/* Agentes */}
                   {agentes.length === 0 ? (
-                    <div style={{ background:'#EAF3DE', border:'0.5px solid #C0DD97', borderRadius:8, padding:'14px 16px', marginBottom:14, textAlign:'center' }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:'#27500A', marginBottom:4 }}>
-                        Sem agentes nocivos identificados
+                    <div style={{ background:'#EAF3DE', border:'0.5px solid #C0DD97', borderRadius:8, padding:'14px 16px', marginBottom:14 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                        <span style={{ padding:'3px 10px', borderRadius:99, fontSize:12, fontWeight:700, background:'#27500A', color:'#fff', fontFamily:'monospace', letterSpacing:'.02em' }}>
+                          09.01.001
+                        </span>
+                        <span style={{ fontSize:12, fontWeight:600, color:'#27500A' }}>Ausência de agente nocivo</span>
                       </div>
                       <div style={{ fontSize:11, color:'#3a7d20', lineHeight:1.6 }}>
-                        O S-2240 será transmitido sem <code style={{ background:'#d4edda', padding:'0 4px', borderRadius:3 }}>&lt;agNocivo&gt;</code>,<br/>
-                        indicando ausência de exposição a agentes acima dos limites de tolerância.
+                        Ausência de agente nocivo ou de atividades previstas no <strong>Anexo IV do Decreto 3.048/1999</strong>.<br/>
+                        Este código será enviado no S-2240 para indicar que não há exposição a agentes que justifiquem aposentadoria especial.
                       </div>
                       {ghe && (
                         <button onClick={() => router.push('/ltcat')}
                           style={{ marginTop:10, padding:'5px 14px', fontSize:11, background:'transparent', border:'1px solid #3a7d20', borderRadius:6, color:'#3a7d20', cursor:'pointer' }}>
-                          Cadastrar agentes no LTCAT →
+                          Cadastrar agentes nocivos no LTCAT →
                         </button>
                       )}
                     </div>
