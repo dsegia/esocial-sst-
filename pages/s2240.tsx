@@ -31,6 +31,18 @@ const EXAMES_ESOCIAL = [
   { codigo: '099', nome: 'Outros' },
 ]
 
+// Tipos de ASO que obrigam o envio de S-2240 (admissão, mudança de função, retorno e demissão)
+const TIPOS_EXIGEM_S2240 = new Set(['admissional', 'mudanca', 'retorno', 'demissional'])
+
+const TIPO_LABEL_S2240: Record<string, string> = {
+  admissional: 'Admissional',
+  mudanca:     'Mudança de função',
+  retorno:     'Retorno ao trabalho',
+  demissional: 'Demissional',
+  periodico:   'Periódico',
+  monitoracao: 'Monitoração pontual',
+}
+
 function codigoDeExame(nome: string): string {
   const n = nome.toLowerCase()
   const match = EXAMES_ESOCIAL.find(e =>
@@ -191,11 +203,18 @@ export default function S2240() {
   function statusFuncionario(func) {
     const tx  = ultimaTx(func.id)
     const ghe = gheDoFuncionario(func)
+    const aso = ultimoAsoFunc(func.id)
     const dadosOk = func.data_adm && func.data_nasc && func.matricula_esocial && !func.matricula_esocial.startsWith('PEND-')
 
     if (!ltcatAtivo) return { label:'Sem LTCAT', cor:'#E24B4A', bg:'#FCEBEB', pode:false, motivo:'Nenhum LTCAT ativo' }
     if (!dadosOk)    return { label:'Dados incompletos', cor:'#EF9F27', bg:'#FAEEDA', pode:false, motivo:'Faltam admissão, nascimento ou matrícula eSocial' }
     if (!ghe)        return { label:'GHE não vinculado', cor:'#EF9F27', bg:'#FAEEDA', pode:false, motivo:'Clique em "Vincular GHE" para associar' }
+
+    // Verificar tipo de ASO: periódico e monitoração não geram S-2240
+    if (aso && !TIPOS_EXIGEM_S2240.has(aso.tipo_aso)) {
+      const tipoLabel = TIPO_LABEL_S2240[aso.tipo_aso] || aso.tipo_aso
+      return { label:'Só S-2220', cor:'#6b7280', bg:'#f3f4f6', pode:false, motivo:`ASO ${tipoLabel} — usar S-2220` }
+    }
 
     if (!tx) return { label:'Não transmitido', cor:'#EF9F27', bg:'#FAEEDA', pode:true, motivo:'Clique em "Criar S-2240" para registrar' }
     if (tx.status === 'enviado')   return { label:'Transmitido', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:`Recibo: ${tx.recibo||'—'}` }
@@ -258,7 +277,12 @@ export default function S2240() {
   }
 
   async function criarParaTodos() {
-    const aptos = funcsFiltradas.filter(f => statusFuncionario(f).label === 'Não transmitido')
+    // Apenas funcionários cujo ASO exige S-2240 (admissional, mudança, retorno, demissional)
+    const aptos = funcsFiltradas.filter(f => {
+      if (statusFuncionario(f).label !== 'Não transmitido') return false
+      const aso = ultimoAsoFunc(f.id)
+      return !aso || TIPOS_EXIGEM_S2240.has(aso.tipo_aso)
+    })
     for (const f of aptos) await criarTransmissao(f.id)
     setSucesso(`${aptos.length} transmissão(ões) criada(s). Acesse "Ir para transmissão" para enviar.`)
   }
@@ -483,6 +507,22 @@ export default function S2240() {
                       {st.label}
                     </span>
                     {st.motivo && <div style={{ fontSize:10, color:'#9ca3af', marginTop:3, maxWidth:160 }}>{st.motivo}</div>}
+                    {(() => {
+                      const aso = ultimoAsoFunc(f.id)
+                      if (!aso) return null
+                      const tipoLabel = TIPO_LABEL_S2240[aso.tipo_aso] || aso.tipo_aso
+                      const exige = TIPOS_EXIGEM_S2240.has(aso.tipo_aso)
+                      return (
+                        <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:10, padding:'1px 6px', borderRadius:99, fontWeight:600,
+                            background: exige ? '#E6F1FB' : '#f3f4f6',
+                            color:      exige ? '#0C447C' : '#6b7280',
+                          }}>
+                            {tipoLabel}
+                          </span>
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td style={s.td}>
                     <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
