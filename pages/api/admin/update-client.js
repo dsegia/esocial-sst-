@@ -38,8 +38,7 @@ export default async function handler(req, res) {
   try {
     const patch = {}
     if (plano !== undefined) patch.plano = plano
-    if (bloqueado !== undefined) patch.bloqueado = bloqueado
-    if (observacao !== undefined) patch.observacao_admin = observacao
+    if (bloqueado !== undefined) patch.ativo = !bloqueado  // coluna real é "ativo"
     if (plano === 'trial') patch.trial_inicio = new Date().toISOString()
 
     const { error } = await sb.from('empresas').update(patch).eq('id', empresa_id)

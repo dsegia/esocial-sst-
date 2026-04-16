@@ -15,17 +15,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ erro: 'Variáveis ADMIN_EMAIL e SUPABASE_SERVICE_ROLE_KEY não configuradas' })
   }
 
-  // Valida o token do usuário logado
   const token = req.headers.authorization?.replace('Bearer ', '')
   if (!token) return res.status(401).json({ erro: 'Não autenticado' })
 
-  // Verifica a sessão com a anon key (seguro para validação)
   const supabaseAnon = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   const { data: { user }, error: authErr } = await supabaseAnon.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ erro: 'Sessão inválida' })
   if (user.email !== adminEmail) return res.status(403).json({ erro: 'Acesso restrito' })
 
-  // A partir daqui usa service role (bypassa RLS)
   const sb = createClient(supabaseUrl, serviceKey)
 
   const mesAtual = new Date()
@@ -33,80 +30,73 @@ export default async function handler(req, res) {
   const inicioMesPassado = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1).toISOString()
 
   try {
-    // Busca todas as empresas com usuário responsável
-    // Tenta com 'bloqueado'; se a coluna não existir ainda, busca sem ela
-    let empresas = null
-    const { data: emp1, error: errEmp1 } = await sb
+    // Busca todas as empresas — usa nomes reais das colunas (criado_em, ativo)
+    const { data: empresas, error: errEmp } = await sb
       .from('empresas')
-      .select('id, razao_social, cnpj, plano, trial_inicio, bloqueado, created_at')
-      .order('created_at', { ascending: false })
+      .select('id, razao_social, cnpj, plano, trial_inicio, ativo, criado_em')
+      .order('criado_em', { ascending: false })
 
-    if (errEmp1) {
-      // Coluna bloqueado ainda não existe — busca sem ela
-      const { data: emp2, error: errEmp2 } = await sb
-        .from('empresas')
-        .select('id, razao_social, cnpj, plano, trial_inicio, created_at')
-        .order('created_at', { ascending: false })
-      if (errEmp2) throw new Error('Erro ao buscar empresas: ' + errEmp2.message)
-      empresas = (emp2 || []).map(e => ({ ...e, bloqueado: false }))
-    } else {
-      empresas = emp1
-    }
+    if (errEmp) throw new Error('Erro ao buscar empresas: ' + errEmp.message)
 
     const empresaIds = (empresas || []).map(e => e.id)
 
-    // Transmissões do mês atual por empresa
+    // Transmissões do mês atual — status real: pendente | enviado | rejeitado | lote
     const { data: transAtual } = await sb
       .from('transmissoes')
-      .select('empresa_id, status, created_at, evento')
-      .gte('created_at', inicioMes)
-      .in('empresa_id', empresaIds)
+      .select('empresa_id, status, criado_em, evento')
+      .gte('criado_em', inicioMes)
+      .in('empresa_id', empresaIds.length > 0 ? empresaIds : ['00000000-0000-0000-0000-000000000000'])
 
-    // Transmissões do mês passado (para comparação)
+    // Transmissões do mês passado (comparação)
     const { data: transPassado } = await sb
       .from('transmissoes')
       .select('empresa_id, status')
-      .gte('created_at', inicioMesPassado)
-      .lt('created_at', inicioMes)
-      .in('empresa_id', empresaIds)
+      .gte('criado_em', inicioMesPassado)
+      .lt('criado_em', inicioMes)
+      .in('empresa_id', empresaIds.length > 0 ? empresaIds : ['00000000-0000-0000-0000-000000000000'])
 
-    // Usuários por empresa (responsável)
+    // Responsáveis via usuario_empresas + usuarios
     const { data: usuarioEmpresas } = await sb
       .from('usuario_empresas')
       .select('empresa_id, usuario_id, perfil')
-      .in('empresa_id', empresaIds)
+      .in('empresa_id', empresaIds.length > 0 ? empresaIds : ['00000000-0000-0000-0000-000000000000'])
       .eq('perfil', 'admin')
 
     const { data: usuarios } = await sb
       .from('usuarios')
-      .select('id, nome, email')
+      .select('id, nome')
+
+    // Email dos usuários via auth (service role permite)
+    const { data: authUsers } = await sb.auth.admin.listUsers()
+    const mapAuthEmail = {}
+    for (const au of (authUsers?.users || [])) {
+      mapAuthEmail[au.id] = au.email
+    }
 
     // Funcionários ativos por empresa
-    const { data: funcionarios } = await sb
-      .from('funcionarios')
-      .select('empresa_id')
-      .eq('ativo', true)
-      .in('empresa_id', empresaIds)
+    const { data: funcionarios } = empresaIds.length > 0
+      ? await sb.from('funcionarios').select('empresa_id').eq('ativo', true).in('empresa_id', empresaIds)
+      : { data: [] }
 
-    // Últimas 20 transmissões (qualquer empresa)
+    // Últimas 20 transmissões
     const { data: recentes } = await sb
       .from('transmissoes')
-      .select('id, empresa_id, evento, status, created_at, erro')
-      .order('created_at', { ascending: false })
+      .select('id, empresa_id, evento, status, criado_em, erro_descricao')
+      .order('criado_em', { ascending: false })
       .limit(20)
 
-    // Monta mapa de métricas por empresa
+    // Mapas de métricas
     const mapTrans = {}
     const mapTransPassado = {}
     const mapFuncs = {}
     const mapUsuario = {}
 
     for (const t of (transAtual || [])) {
-      if (!mapTrans[t.empresa_id]) mapTrans[t.empresa_id] = { total: 0, pendente: 0, erro: 0, transmitido: 0 }
+      if (!mapTrans[t.empresa_id]) mapTrans[t.empresa_id] = { total: 0, pendente: 0, erro: 0, enviado: 0 }
       mapTrans[t.empresa_id].total++
-      if (t.status === 'pendente')    mapTrans[t.empresa_id].pendente++
-      if (t.status === 'erro')        mapTrans[t.empresa_id].erro++
-      if (t.status === 'transmitido') mapTrans[t.empresa_id].transmitido++
+      if (t.status === 'pendente')   mapTrans[t.empresa_id].pendente++
+      if (t.status === 'rejeitado')  mapTrans[t.empresa_id].erro++
+      if (t.status === 'enviado')    mapTrans[t.empresa_id].enviado++
     }
 
     for (const t of (transPassado || [])) {
@@ -120,24 +110,31 @@ export default async function handler(req, res) {
     for (const ue of (usuarioEmpresas || [])) {
       if (!mapUsuario[ue.empresa_id]) {
         const u = (usuarios || []).find(u => u.id === ue.usuario_id)
-        if (u) mapUsuario[ue.empresa_id] = { nome: u.nome, email: u.email }
+        if (u) mapUsuario[ue.empresa_id] = {
+          nome: u.nome,
+          email: mapAuthEmail[u.id] || '',
+        }
       }
     }
 
-    // Enriquece empresas com métricas
+    // Enriquece empresas
     const empresasEnriquecidas = (empresas || []).map(emp => {
-      const trans = mapTrans[emp.id] || { total: 0, pendente: 0, erro: 0, transmitido: 0 }
+      const trans = mapTrans[emp.id] || { total: 0, pendente: 0, erro: 0, enviado: 0 }
       const transAnterior = mapTransPassado[emp.id] || 0
       const variacao = transAnterior > 0
         ? Math.round(((trans.total - transAnterior) / transAnterior) * 100)
         : null
       return {
-        ...emp,
-        bloqueado: emp.bloqueado || false,
+        id: emp.id,
+        razao_social: emp.razao_social,
+        cnpj: emp.cnpj,
+        plano: emp.plano,
+        bloqueado: !emp.ativo,               // ativo=false significa bloqueado
+        created_at: emp.criado_em,
         trans_mes: trans.total,
         trans_pendente: trans.pendente,
         trans_erro: trans.erro,
-        trans_transmitido: trans.transmitido,
+        trans_transmitido: trans.enviado,
         trans_mes_passado: transAnterior,
         variacao_pct: variacao,
         funcionarios: mapFuncs[emp.id] || 0,
@@ -148,21 +145,25 @@ export default async function handler(req, res) {
       }
     })
 
-    // Enriquece transmissões recentes com nome da empresa
+    // Enriquece transmissões recentes
     const mapEmp = {}
     for (const e of (empresas || [])) mapEmp[e.id] = e.razao_social
 
     const recentesEnriquecidas = (recentes || []).map(t => ({
-      ...t,
+      id: t.id,
+      empresa_id: t.empresa_id,
       empresa_nome: mapEmp[t.empresa_id] || t.empresa_id,
+      evento: t.evento,
+      status: t.status,
+      created_at: t.criado_em,
+      erro: t.erro_descricao || null,
     }))
 
-    // Totais globais
-    const totalEmpresas  = empresas?.length || 0
-    const totalTrans     = (transAtual || []).length
-    const totalPendente  = (transAtual || []).filter(t => t.status === 'pendente').length
-    const totalErros     = (transAtual || []).filter(t => t.status === 'erro').length
-    const totalFuncs     = Object.values(mapFuncs).reduce((a, b) => a + b, 0)
+    const totalEmpresas = empresas?.length || 0
+    const totalTrans    = (transAtual || []).length
+    const totalPendente = (transAtual || []).filter(t => t.status === 'pendente').length
+    const totalErros    = (transAtual || []).filter(t => t.status === 'rejeitado').length
+    const totalFuncs    = Object.values(mapFuncs).reduce((a, b) => a + b, 0)
 
     return res.status(200).json({
       ok: true,
