@@ -78,7 +78,19 @@ export default function Admin() {
   const [erroSistema, setErroSistema] = useState('')
   const [marcandoErro, setMarcandoErro] = useState<string | null>(null)
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => {
+    carregar()
+
+    // Realtime: recarrega a lista quando uma empresa é inserida ou atualizada
+    const canal = supabase
+      .channel('admin-empresas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, () => {
+        carregar()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(canal) }
+  }, [])
 
   useEffect(() => {
     if (aba === 'sistema') carregarSistema()
@@ -510,8 +522,28 @@ export default function Admin() {
             {/* Cabeçalho da aba */}
             <div style={{ padding: '1rem 1.25rem', borderBottom: '0.5px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>Clientes ({clientesFiltrados.length})</div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Gerencie planos, convites e acessos</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#111', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  Clientes ({clientesFiltrados.length})
+                  {(() => {
+                    const trials = empresas.filter(e => e.plano === 'trial' && (e.trial_restante ?? 0) > 0)
+                    const expirados = empresas.filter(e => e.plano === 'trial' && (e.trial_restante ?? 1) <= 0)
+                    return (
+                      <>
+                        {trials.length > 0 && (
+                          <span style={{ fontSize: 11, padding: '2px 8px', background: '#E6F1FB', color: '#185FA5', borderRadius: 99, fontWeight: 600 }}>
+                            {trials.length} trial{trials.length > 1 ? 's' : ''} ativo{trials.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {expirados.length > 0 && (
+                          <span style={{ fontSize: 11, padding: '2px 8px', background: '#FAEEDA', color: '#633806', borderRadius: 99, fontWeight: 600 }}>
+                            {expirados.length} expirado{expirados.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Atualização em tempo real · Gerencie planos, convites e acessos</div>
               </div>
               <input
                 type="text"

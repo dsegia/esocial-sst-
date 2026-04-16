@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     // Busca todas as empresas com usuário responsável
     const { data: empresas } = await sb
       .from('empresas')
-      .select('id, razao_social, cnpj, plano, trial_inicio, created_at')
+      .select('id, razao_social, cnpj, plano, trial_inicio, bloqueado, created_at')
       .order('created_at', { ascending: false })
 
     const empresaIds = (empresas || []).map(e => e.id)
@@ -119,6 +119,7 @@ export default async function handler(req, res) {
         : null
       return {
         ...emp,
+        bloqueado: emp.bloqueado || false,
         trans_mes: trans.total,
         trans_pendente: trans.pendente,
         trans_erro: trans.erro,
