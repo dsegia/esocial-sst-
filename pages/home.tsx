@@ -123,6 +123,14 @@ const globalCSS = [
   '.stat { text-align: center; }',
   '.stat-num { font-size: 32px; font-weight: 800; color: #185FA5; }',
   '.stat-label { font-size: 12px; color: #6b7280; margin-top: 3px; }',
+  '.social-section { background: #f9fafb; padding: 64px 24px; text-align: center; }',
+  '.social-bar { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 32px; }',
+  '.social-btn { display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 700; text-decoration: none; transition: transform .15s, box-shadow .15s; border: none; cursor: pointer; }',
+  '.social-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }',
+  '.social-btn-phone { background: #22c55e; color: #fff; }',
+  '.social-btn-email { background: #185FA5; color: #fff; }',
+  '.social-btn-ig { background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); color: #fff; }',
+  '.social-btn-fb { background: #1877f2; color: #fff; }',
   '@media (max-width: 768px) {',
   '  .nav-links, .nav-cta { display: none; }',
   '  .nav-mobile-btn { display: block; }',
@@ -486,7 +494,7 @@ export default function Home() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{flexShrink:0,marginTop:1}}>
                     <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>
                   </svg>
-                  <a href="https://facebook.com/DsegConsultoria" target="_blank" rel="noopener noreferrer" style={{color:'#374151',textDecoration:'none'}}>Dseg Consultoria</a>
+                  <a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer" style={{color:'#374151',textDecoration:'none'}}>Dseg Consultoria</a>
                 </li>
               </ul>
               <a href="tel:+5564992090277" className="price-btn price-btn-outline">Ligar agora</a>
@@ -530,6 +538,41 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* REDES SOCIAIS */}
+      <section className="social-section">
+        <div className="section-label">Fale conosco</div>
+        <h2 className="section-title" style={{ marginBottom:8 }}>Estamos nas redes sociais</h2>
+        <p style={{ fontSize:15, color:'#6b7280', maxWidth:480, margin:'0 auto', lineHeight:1.7 }}>
+          Dúvidas, suporte ou quer conhecer mais? Entre em contato pelo canal que preferir.
+        </p>
+        <div className="social-bar">
+          <a href="tel:+5564992090277" className="social-btn social-btn-phone">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+            </svg>
+            (64) 99209-0277
+          </a>
+          <a href="mailto:dseg.sst@gmail.com" className="social-btn social-btn-email">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+            </svg>
+            dseg.sst@gmail.com
+          </a>
+          <a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer" className="social-btn social-btn-ig">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+            </svg>
+            @dseg.sst
+          </a>
+          <a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer" className="social-btn social-btn-fb">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>
+            </svg>
+            Dseg Consultoria
+          </a>
         </div>
       </section>
 
@@ -586,7 +629,7 @@ export default function Home() {
                 <li><a href="tel:+5564992090277">(64) 99209-0277</a></li>
                 <li><a href="mailto:dseg.sst@gmail.com">dseg.sst@gmail.com</a></li>
                 <li><a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer">Instagram</a></li>
-                <li><a href="https://facebook.com/DsegConsultoria" target="_blank" rel="noopener noreferrer">Facebook</a></li>
+                <li><a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer">Facebook</a></li>
               </ul>
             </div>
           </div>
