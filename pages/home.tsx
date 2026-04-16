@@ -1,154 +1,287 @@
 import Head from 'next/head'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
+// ─── CSS ─────────────────────────────────────────────────────────────────────
 const globalCSS = [
-  '* { margin: 0; padding: 0; box-sizing: border-box; }',
-  'html { scroll-behavior: smooth; }',
-  "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111; background: #fff; }",
-  'nav { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; }',
-  '.nav-inner { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; }',
-  '.nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }',
-  '.nav-logo-icon { width: 36px; height: 36px; background: #185FA5; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }',
-  '.nav-logo-text { font-size: 15px; font-weight: 700; color: #111; }',
-  '.nav-logo-sub { font-size: 10px; color: #6b7280; font-weight: 400; }',
-  '.nav-links { display: flex; align-items: center; gap: 28px; }',
-  '.nav-links a { font-size: 13px; color: #374151; text-decoration: none; font-weight: 500; }',
-  '.nav-links a:hover { color: #185FA5; }',
-  '.nav-cta { display: flex; gap: 10px; }',
-  '.btn-outline { padding: 7px 16px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; font-weight: 500; color: #374151; background: #fff; cursor: pointer; text-decoration: none; }',
-  '.btn-outline:hover { border-color: #185FA5; color: #185FA5; }',
-  '.btn-primary { padding: 7px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; color: #fff; background: #185FA5; cursor: pointer; text-decoration: none; }',
-  '.btn-primary:hover { background: #145089; }',
-  '.nav-mobile-btn { display: none; background: none; border: none; cursor: pointer; padding: 4px; }',
-  '.hero { background: linear-gradient(160deg, #f0f6ff 0%, #e8f2ff 40%, #f5f9ff 100%); padding: 100px 24px 80px; text-align: center; }',
-  '.hero-badge { display: inline-flex; align-items: center; gap: 6px; background: #E6F1FB; color: #185FA5; border: 1px solid #b5d4f4; border-radius: 99px; padding: 5px 14px; font-size: 12px; font-weight: 600; margin-bottom: 24px; }',
-  '.hero h1 { font-size: clamp(32px, 5vw, 54px); font-weight: 800; color: #0b1f3a; line-height: 1.15; max-width: 760px; margin: 0 auto 20px; letter-spacing: -0.5px; }',
-  '.hero h1 span { color: #185FA5; }',
-  '.hero p { font-size: clamp(15px, 2vw, 18px); color: #4b5563; max-width: 560px; margin: 0 auto 36px; line-height: 1.7; }',
-  '.hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }',
-  '.btn-hero-primary { padding: 14px 28px; background: #185FA5; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }',
-  '.btn-hero-primary:hover { background: #145089; }',
-  '.btn-hero-outline { padding: 14px 28px; background: #fff; color: #185FA5; border: 2px solid #185FA5; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; }',
-  '.btn-hero-outline:hover { background: #f0f6ff; }',
-  '.hero-note { margin-top: 16px; font-size: 12px; color: #9ca3af; }',
-  '.section { max-width: 1120px; margin: 0 auto; padding: 80px 24px; }',
-  '.section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #185FA5; margin-bottom: 12px; text-align: center; }',
-  '.section-title { font-size: clamp(24px, 3.5vw, 38px); font-weight: 800; color: #0b1f3a; text-align: center; line-height: 1.2; max-width: 640px; margin: 0 auto 16px; letter-spacing: -0.3px; }',
-  '.section-desc { font-size: 16px; color: #6b7280; text-align: center; max-width: 520px; margin: 0 auto 56px; line-height: 1.7; }',
-  '.events-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }',
-  '.event-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; transition: box-shadow .2s, border-color .2s; }',
-  '.event-card:hover { box-shadow: 0 8px 24px rgba(24,95,165,0.1); border-color: #b5d4f4; }',
-  '.event-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; background: #E6F1FB; color: #185FA5; margin-bottom: 12px; }',
-  '.event-card h3 { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 8px; }',
-  '.event-card p { font-size: 13px; color: #6b7280; line-height: 1.6; }',
-  '.ai-section { background: linear-gradient(135deg, #0b1f3a 0%, #185FA5 100%); color: #fff; padding: 80px 24px; }',
-  '.ai-inner { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }',
-  '.ai-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #93c5fd; margin-bottom: 12px; }',
-  '.ai-title { font-size: clamp(24px, 3.5vw, 38px); font-weight: 800; line-height: 1.2; margin-bottom: 20px; letter-spacing: -0.3px; }',
-  '.ai-desc { font-size: 16px; color: #bfdbfe; line-height: 1.7; margin-bottom: 32px; }',
-  '.ai-features { display: flex; flex-direction: column; gap: 14px; }',
-  '.ai-feature { display: flex; align-items: flex-start; gap: 12px; }',
-  '.ai-feature-icon { width: 32px; height: 32px; background: rgba(255,255,255,0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }',
-  '.ai-feature-text h4 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }',
-  '.ai-feature-text p { font-size: 13px; color: #bfdbfe; line-height: 1.5; }',
-  '.ai-card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 28px; }',
-  '.ai-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }',
-  '.ai-dot { width: 10px; height: 10px; border-radius: 50%; }',
-  '.ai-doc { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }',
-  '.ai-doc-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #93c5fd; margin-bottom: 6px; }',
-  '.ai-doc-row { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 3px; }',
-  '.ai-doc-val { color: #fff; font-weight: 600; }',
-  '.ai-status { display: flex; align-items: center; gap: 8px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #86efac; font-weight: 500; }',
-  '.ai-status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; }',
-  '.features-bg { background: #f9fafb; padding: 80px 0; }',
-  '.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }',
-  '.feature-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 28px; }',
-  '.feature-icon { width: 44px; height: 44px; background: #E6F1FB; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }',
-  '.feature-card h3 { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 8px; }',
-  '.feature-card p { font-size: 13px; color: #6b7280; line-height: 1.65; }',
-  '.steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; }',
-  '.step { text-align: center; }',
-  '.step-num { width: 48px; height: 48px; background: #185FA5; color: #fff; border-radius: 50%; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }',
-  '.step h3 { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 8px; }',
-  '.step p { font-size: 13px; color: #6b7280; line-height: 1.65; }',
-  '.pricing-bg { background: #f9fafb; padding: 80px 0; }',
-  '.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 900px; margin: 0 auto; }',
-  '.price-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 32px; }',
-  '.price-card.featured { border-color: #185FA5; border-width: 2px; position: relative; }',
-  '.price-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #185FA5; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 14px; border-radius: 99px; white-space: nowrap; }',
-  '.price-plan { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 8px; }',
-  '.price-amount { font-size: 36px; font-weight: 800; color: #111; margin-bottom: 4px; }',
-  '.price-amount span { font-size: 14px; font-weight: 400; color: #6b7280; }',
-  '.price-desc { font-size: 13px; color: #9ca3af; margin-bottom: 24px; line-height: 1.5; }',
-  '.price-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }',
-  '.price-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #374151; }',
-  '.check { color: #22c55e; font-weight: 700; flex-shrink: 0; }',
-  '.price-btn { width: 100%; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: block; text-align: center; border: none; }',
-  '.price-btn-outline { background: #fff; color: #185FA5; border: 2px solid #185FA5; }',
-  '.price-btn-outline:hover { background: #f0f6ff; }',
-  '.price-btn-filled { background: #185FA5; color: #fff; }',
-  '.price-btn-filled:hover { background: #145089; }',
-  '.testimonials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }',
-  '.testimonial { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 28px; }',
-  '.testimonial-stars { color: #f59e0b; font-size: 14px; margin-bottom: 12px; }',
-  '.testimonial p { font-size: 14px; color: #374151; line-height: 1.7; margin-bottom: 16px; font-style: italic; }',
-  '.testimonial-author { display: flex; align-items: center; gap: 12px; }',
-  '.testimonial-avatar { width: 36px; height: 36px; background: #E6F1FB; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #185FA5; flex-shrink: 0; }',
-  '.testimonial-name { font-size: 13px; font-weight: 600; color: #111; }',
-  '.testimonial-role { font-size: 11px; color: #9ca3af; }',
-  '.cta-bg { background: linear-gradient(135deg, #0b1f3a 0%, #185FA5 100%); padding: 80px 24px; text-align: center; }',
-  '.cta-title { font-size: clamp(26px, 4vw, 44px); font-weight: 800; color: #fff; margin-bottom: 16px; max-width: 600px; margin-left: auto; margin-right: auto; letter-spacing: -0.3px; }',
-  '.cta-desc { font-size: 16px; color: #bfdbfe; margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.7; }',
-  '.cta-btns { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }',
-  '.btn-cta-white { padding: 14px 28px; background: #fff; color: #185FA5; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; }',
-  '.btn-cta-white:hover { background: #f0f6ff; }',
-  '.btn-cta-outline { padding: 14px 28px; background: transparent; color: #fff; border: 2px solid rgba(255,255,255,0.4); border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; }',
-  '.btn-cta-outline:hover { border-color: #fff; }',
-  '.cta-note { margin-top: 16px; font-size: 12px; color: rgba(255,255,255,0.5); }',
-  'footer { background: #0b1f3a; padding: 48px 24px 32px; }',
-  '.footer-inner { max-width: 1120px; margin: 0 auto; }',
-  '.footer-top { display: flex; justify-content: space-between; gap: 40px; flex-wrap: wrap; margin-bottom: 40px; }',
-  '.footer-brand p { font-size: 13px; color: #6b7280; line-height: 1.7; margin-top: 12px; max-width: 240px; }',
-  '.footer-links h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 12px; }',
-  '.footer-links ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }',
-  '.footer-links a { font-size: 13px; color: #6b7280; text-decoration: none; }',
-  '.footer-links a:hover { color: #fff; }',
-  '.footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }',
-  '.footer-bottom p { font-size: 12px; color: #4b5563; }',
-  '.footer-logo-text { font-size: 15px; font-weight: 700; color: #fff; }',
-  '.footer-logo-sub { font-size: 10px; color: #6b7280; }',
-  '.divider { border: none; border-top: 1px solid #e5e7eb; }',
-  '.stats-bar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 32px 24px; }',
-  '.stats-inner { max-width: 1120px; margin: 0 auto; display: flex; justify-content: center; gap: 64px; flex-wrap: wrap; }',
-  '.stat { text-align: center; }',
-  '.stat-num { font-size: 32px; font-weight: 800; color: #185FA5; }',
-  '.stat-label { font-size: 12px; color: #6b7280; margin-top: 3px; }',
-  '.social-section { background: #f9fafb; padding: 64px 24px; text-align: center; }',
-  '.social-bar { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 32px; }',
-  '.social-btn { display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 700; text-decoration: none; transition: transform .15s, box-shadow .15s; border: none; cursor: pointer; }',
-  '.social-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }',
-  '.social-btn-phone { background: #22c55e; color: #fff; }',
-  '.social-btn-email { background: #185FA5; color: #fff; }',
-  '.social-btn-ig { background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); color: #fff; }',
-  '.social-btn-fb { background: #1877f2; color: #fff; }',
-  '@media (max-width: 768px) {',
-  '  .nav-links, .nav-cta { display: none; }',
-  '  .nav-mobile-btn { display: block; }',
-  '  .ai-inner { grid-template-columns: 1fr; gap: 40px; }',
-  '  .steps-grid { grid-template-columns: 1fr; }',
-  '  .stats-inner { gap: 32px; }',
-  '  .footer-top { flex-direction: column; }',
+  '* { margin:0; padding:0; box-sizing:border-box; }',
+  'html { scroll-behavior:smooth; }',
+  "body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#f1f5f9; background:#070d1a; }",
+
+  // KEYFRAMES
+  '@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }',
+  '@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.85)} }',
+  '@keyframes glow-ring { 0%,100%{box-shadow:0 0 0 0 rgba(24,95,165,.5)} 50%{box-shadow:0 0 0 8px rgba(24,95,165,0)} }',
+  '@keyframes fade-up { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }',
+  '@keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }',
+  '@keyframes spin-slow { to{transform:rotate(360deg)} }',
+  '@keyframes slide-in { from{opacity:0;transform:translateX(32px)} to{opacity:1;transform:translateX(0)} }',
+  '@keyframes typing { 0%,100%{opacity:1} 50%{opacity:0} }',
+  '@keyframes bar-grow { from{width:0} to{width:var(--w)} }',
+
+  // NAV
+  'nav { position:sticky; top:0; z-index:50; background:rgba(7,13,26,.85); backdrop-filter:blur(12px); border-bottom:1px solid rgba(24,95,165,.25); }',
+  '.nav-inner { max-width:1200px; margin:0 auto; padding:0 24px; height:64px; display:flex; align-items:center; justify-content:space-between; }',
+  '.nav-logo { display:flex; align-items:center; gap:10px; text-decoration:none; }',
+  '.nav-logo-icon { width:38px; height:38px; background:linear-gradient(135deg,#185FA5,#3b82f6); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 0 16px rgba(59,130,246,.35); }',
+  '.nav-logo-text { font-size:16px; font-weight:800; color:#f1f5f9; letter-spacing:-.3px; }',
+  '.nav-logo-sub { font-size:10px; color:#64748b; font-weight:400; }',
+  '.nav-links { display:flex; align-items:center; gap:28px; }',
+  '.nav-links a { font-size:13px; color:#94a3b8; text-decoration:none; font-weight:500; transition:color .15s; }',
+  '.nav-links a:hover { color:#e2e8f0; }',
+  '.nav-cta { display:flex; gap:10px; }',
+  '.btn-ghost { padding:7px 16px; border:1px solid rgba(148,163,184,.25); border-radius:8px; font-size:13px; font-weight:500; color:#94a3b8; background:transparent; cursor:pointer; text-decoration:none; transition:border-color .15s,color .15s; }',
+  '.btn-ghost:hover { border-color:#185FA5; color:#e2e8f0; }',
+  '.btn-nav-cta { padding:8px 18px; border:none; border-radius:8px; font-size:13px; font-weight:600; color:#fff; background:linear-gradient(135deg,#185FA5,#3b82f6); cursor:pointer; text-decoration:none; box-shadow:0 0 14px rgba(59,130,246,.3); transition:box-shadow .2s,transform .1s; }',
+  '.btn-nav-cta:hover { box-shadow:0 0 22px rgba(59,130,246,.5); transform:translateY(-1px); }',
+  '.nav-mobile-btn { display:none; background:none; border:none; cursor:pointer; padding:4px; }',
+
+  // HERO
+  '.hero { min-height:100vh; display:flex; align-items:center; padding:80px 24px 60px; background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(24,95,165,.35) 0%,transparent 70%),#070d1a; overflow:hidden; position:relative; }',
+  '.hero::before { content:""; position:absolute; inset:0; background:url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h1v60H0zm60 0h1v60H60zM0 0v1h60V0zm0 60v1h60V60z\' fill=\'rgba(24,95,165,0.04)\' fill-rule=\'evenodd\'/%3E%3C/svg%3E"); opacity:.6; }',
+  '.hero-inner { max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:center; position:relative; z-index:1; }',
+  '.hero-badge { display:inline-flex; align-items:center; gap:8px; background:rgba(24,95,165,.15); color:#93c5fd; border:1px solid rgba(59,130,246,.3); border-radius:99px; padding:6px 16px; font-size:12px; font-weight:600; margin-bottom:24px; animation:fade-up .6s ease both; }',
+  '.badge-dot { width:7px; height:7px; background:#22c55e; border-radius:50%; animation:pulse-dot 1.5s infinite; }',
+  '.hero h1 { font-size:clamp(36px,4.5vw,58px); font-weight:900; line-height:1.1; margin-bottom:20px; letter-spacing:-1px; animation:fade-up .6s ease .1s both; }',
+  '.hero h1 .grad { background:linear-gradient(135deg,#60a5fa,#3b82f6,#185FA5); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }',
+  '.hero-sub { font-size:clamp(15px,1.8vw,18px); color:#94a3b8; line-height:1.75; margin-bottom:36px; max-width:480px; animation:fade-up .6s ease .2s both; }',
+  '.hero-btns { display:flex; gap:12px; flex-wrap:wrap; animation:fade-up .6s ease .3s both; }',
+  '.btn-cta-main { padding:15px 30px; background:linear-gradient(135deg,#185FA5,#3b82f6); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 24px rgba(59,130,246,.35); transition:transform .15s,box-shadow .15s; }',
+  '.btn-cta-main:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(59,130,246,.5); }',
+  '.btn-cta-sec { padding:15px 28px; background:rgba(255,255,255,.05); color:#e2e8f0; border:1px solid rgba(255,255,255,.12); border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; text-decoration:none; transition:background .15s,border-color .15s; }',
+  '.btn-cta-sec:hover { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.25); }',
+  '.hero-note { margin-top:14px; font-size:12px; color:#475569; animation:fade-up .6s ease .4s both; }',
+  '.hero-note span { color:#64748b; }',
+
+  // MOCKUP
+  '.mockup-wrap { animation:slide-in .8s ease .2s both; }',
+  '.mockup { background:rgba(14,26,45,.8); border:1px solid rgba(24,95,165,.3); border-radius:16px; overflow:hidden; box-shadow:0 20px 80px rgba(0,0,0,.6),0 0 40px rgba(24,95,165,.15); }',
+  '.mockup-bar { background:rgba(7,13,26,.9); padding:10px 16px; display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(24,95,165,.2); }',
+  '.mock-dot { width:10px; height:10px; border-radius:50%; }',
+  '.mockup-title { font-size:11px; color:#475569; margin-left:auto; font-family:monospace; }',
+  '.mockup-body { padding:16px; }',
+  '.mock-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }',
+  '.mock-stat-card { background:rgba(24,95,165,.1); border:1px solid rgba(24,95,165,.2); border-radius:8px; padding:10px; text-align:center; }',
+  '.mock-stat-num { font-size:20px; font-weight:800; color:#60a5fa; }',
+  '.mock-stat-label { font-size:9px; color:#64748b; margin-top:2px; text-transform:uppercase; letter-spacing:.5px; }',
+  '.mock-table-header { display:grid; grid-template-columns:1.5fr 1fr 1fr; gap:6px; padding:6px 8px; font-size:9px; color:#475569; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid rgba(255,255,255,.06); margin-bottom:6px; }',
+  '.mock-row { display:grid; grid-template-columns:1.5fr 1fr 1fr; gap:6px; padding:7px 8px; border-radius:6px; font-size:11px; align-items:center; transition:background .15s; }',
+  '.mock-row:hover { background:rgba(24,95,165,.1); }',
+  '.mock-nome { color:#e2e8f0; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }',
+  '.mock-evento { color:#94a3b8; font-size:10px; }',
+  '.mock-badge { padding:2px 8px; border-radius:99px; font-size:9px; font-weight:700; text-align:center; white-space:nowrap; }',
+  '.mock-badge-ok { background:rgba(34,197,94,.15); color:#4ade80; border:1px solid rgba(34,197,94,.25); }',
+  '.mock-badge-pend { background:rgba(239,159,39,.15); color:#fbbf24; border:1px solid rgba(239,159,39,.25); }',
+  '.mock-badge-new { background:rgba(59,130,246,.15); color:#93c5fd; border:1px solid rgba(59,130,246,.25); }',
+  '.mock-ai-bar { background:rgba(24,95,165,.08); border:1px solid rgba(59,130,246,.2); border-radius:8px; padding:8px 12px; margin-top:10px; display:flex; align-items:center; gap:8px; font-size:10px; color:#93c5fd; }',
+  '.mock-ai-dot { width:6px; height:6px; background:#22c55e; border-radius:50%; animation:pulse-dot 1.5s infinite; flex-shrink:0; }',
+
+  // STATS SECTION
+  '.stats-section { background:rgba(14,26,45,.6); border-top:1px solid rgba(24,95,165,.2); border-bottom:1px solid rgba(24,95,165,.2); padding:36px 24px; }',
+  '.stats-inner { max-width:1200px; margin:0 auto; display:flex; justify-content:center; gap:0; flex-wrap:wrap; }',
+  '.stat-item { text-align:center; padding:0 48px; position:relative; }',
+  '.stat-item:not(:last-child)::after { content:""; position:absolute; right:0; top:10%; height:80%; width:1px; background:rgba(24,95,165,.25); }',
+  '.stat-num { font-size:38px; font-weight:900; background:linear-gradient(135deg,#60a5fa,#3b82f6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; letter-spacing:-1px; }',
+  '.stat-label { font-size:12px; color:#64748b; margin-top:4px; font-weight:500; }',
+
+  // SECTION common
+  '.section-wrap { max-width:1200px; margin:0 auto; padding:80px 24px; }',
+  '.section-tag { display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:#3b82f6; background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.2); border-radius:99px; padding:4px 14px; margin-bottom:14px; }',
+  '.section-h2 { font-size:clamp(26px,3.5vw,42px); font-weight:900; color:#f1f5f9; line-height:1.15; max-width:640px; margin:0 auto 14px; text-align:center; letter-spacing:-.5px; }',
+  '.section-h2 .grad { background:linear-gradient(135deg,#60a5fa,#3b82f6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }',
+  '.section-desc { font-size:16px; color:#64748b; text-align:center; max-width:520px; margin:0 auto 56px; line-height:1.75; }',
+
+  // EVENTS
+  '.events-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }',
+  '.event-card { background:rgba(14,26,45,.7); border:1px solid rgba(24,95,165,.2); border-radius:14px; padding:26px; transition:border-color .2s,transform .2s,box-shadow .2s; cursor:default; }',
+  '.event-card:hover { border-color:rgba(59,130,246,.5); transform:translateY(-4px); box-shadow:0 16px 40px rgba(0,0,0,.3),0 0 24px rgba(24,95,165,.15); }',
+  '.event-code { display:inline-block; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:800; background:linear-gradient(135deg,#185FA5,#3b82f6); color:#fff; margin-bottom:14px; font-family:monospace; letter-spacing:.5px; box-shadow:0 4px 12px rgba(59,130,246,.25); }',
+  '.event-card h3 { font-size:15px; font-weight:700; color:#e2e8f0; margin-bottom:8px; }',
+  '.event-card p { font-size:13px; color:#64748b; line-height:1.65; }',
+
+  // AI SECTION
+  '.ai-bg { background:linear-gradient(160deg,#0a1628 0%,#0d1f3c 100%); padding:80px 0; border-top:1px solid rgba(24,95,165,.2); border-bottom:1px solid rgba(24,95,165,.2); overflow:hidden; position:relative; }',
+  '.ai-bg::after { content:""; position:absolute; top:-40%; right:-10%; width:500px; height:500px; background:radial-gradient(circle,rgba(59,130,246,.12) 0%,transparent 70%); pointer-events:none; }',
+  '.ai-inner { max-width:1200px; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:72px; align-items:center; position:relative; z-index:1; }',
+  '.ai-tag { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:#3b82f6; margin-bottom:14px; }',
+  '.ai-h2 { font-size:clamp(28px,3.5vw,44px); font-weight:900; line-height:1.15; margin-bottom:18px; letter-spacing:-.5px; }',
+  '.ai-h2 .grad { background:linear-gradient(135deg,#60a5fa,#93c5fd); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }',
+  '.ai-desc { font-size:15px; color:#64748b; line-height:1.75; margin-bottom:36px; }',
+  '.ai-steps { display:flex; flex-direction:column; gap:0; }',
+  '.ai-step { display:flex; gap:16px; position:relative; padding-bottom:24px; }',
+  '.ai-step:not(:last-child)::before { content:""; position:absolute; left:19px; top:38px; bottom:0; width:2px; background:linear-gradient(to bottom,rgba(59,130,246,.4),rgba(59,130,246,.1)); }',
+  '.ai-step-icon { width:38px; height:38px; border-radius:10px; background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3); display:flex; align-items:center; justify-content:center; flex-shrink:0; }',
+  '.ai-step-text h4 { font-size:14px; font-weight:700; color:#e2e8f0; margin-bottom:3px; }',
+  '.ai-step-text p { font-size:12px; color:#64748b; line-height:1.6; }',
+  '.ai-terminal { background:#0a1628; border:1px solid rgba(59,130,246,.25); border-radius:14px; overflow:hidden; box-shadow:0 24px 80px rgba(0,0,0,.5),0 0 40px rgba(24,95,165,.1); }',
+  '.ai-terminal-bar { background:rgba(255,255,255,.04); padding:10px 16px; display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,.06); }',
+  '.ai-terminal-body { padding:20px; }',
+  '.ai-file-card { background:rgba(24,95,165,.08); border:1px solid rgba(59,130,246,.2); border-radius:10px; padding:14px 16px; margin-bottom:12px; }',
+  '.ai-file-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#3b82f6; margin-bottom:10px; display:flex; align-items:center; gap:6px; }',
+  '.ai-field { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; margin-bottom:5px; padding-bottom:5px; border-bottom:1px solid rgba(255,255,255,.04); }',
+  '.ai-field:last-child { border:none; margin:0; padding:0; }',
+  '.ai-field-val { color:#e2e8f0; font-weight:600; }',
+  '.ai-status-bar { display:flex; align-items:center; gap:8px; background:rgba(34,197,94,.08); border:1px solid rgba(34,197,94,.2); border-radius:8px; padding:10px 14px; font-size:11px; color:#4ade80; font-weight:600; }',
+
+  // FEATURES
+  '.features-bg { padding:80px 0; }',
+  '.features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:16px; }',
+  '.feat-card { background:rgba(14,26,45,.7); border:1px solid rgba(24,95,165,.15); border-radius:14px; padding:28px; transition:border-color .2s,transform .2s; }',
+  '.feat-card:hover { border-color:rgba(59,130,246,.4); transform:translateY(-3px); }',
+  '.feat-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:18px; flex-shrink:0; }',
+  '.feat-card h3 { font-size:15px; font-weight:700; color:#e2e8f0; margin-bottom:8px; }',
+  '.feat-card p { font-size:13px; color:#64748b; line-height:1.65; }',
+
+  // HOW IT WORKS
+  '.how-bg { background:rgba(14,26,45,.5); padding:80px 0; border-top:1px solid rgba(24,95,165,.15); border-bottom:1px solid rgba(24,95,165,.15); }',
+  '.steps-flow { display:flex; gap:0; align-items:flex-start; flex-wrap:wrap; }',
+  '.step-item { flex:1; min-width:200px; text-align:center; padding:0 20px; position:relative; }',
+  '.step-item:not(:last-child)::after { content:"→"; position:absolute; right:-16px; top:20px; font-size:20px; color:rgba(59,130,246,.4); }',
+  '.step-circle { width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg,#185FA5,#3b82f6); color:#fff; font-size:18px; font-weight:900; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; box-shadow:0 4px 20px rgba(59,130,246,.3); }',
+  '.step-item h3 { font-size:14px; font-weight:700; color:#e2e8f0; margin-bottom:8px; }',
+  '.step-item p { font-size:12px; color:#64748b; line-height:1.65; }',
+
+  // PRICING
+  '.pricing-bg { padding:80px 0; }',
+  '.pricing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; max-width:920px; margin:0 auto; }',
+  '.price-card { background:rgba(14,26,45,.7); border:1px solid rgba(24,95,165,.2); border-radius:16px; padding:32px; position:relative; transition:border-color .2s,transform .2s; }',
+  '.price-card:hover { transform:translateY(-4px); }',
+  '.price-card.featured { border-color:rgba(59,130,246,.5); background:linear-gradient(145deg,rgba(14,26,45,.95),rgba(24,95,165,.12)); box-shadow:0 0 40px rgba(59,130,246,.12); }',
+  '.price-pill { position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#185FA5,#3b82f6); color:#fff; font-size:11px; font-weight:700; padding:4px 16px; border-radius:99px; white-space:nowrap; box-shadow:0 4px 12px rgba(59,130,246,.3); }',
+  '.price-plan { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:#64748b; margin-bottom:10px; }',
+  '.price-amount { font-size:40px; font-weight:900; color:#f1f5f9; margin-bottom:4px; letter-spacing:-1px; }',
+  '.price-amount span { font-size:14px; font-weight:400; color:#64748b; }',
+  '.price-desc { font-size:13px; color:#64748b; margin-bottom:24px; line-height:1.6; }',
+  '.price-list { list-style:none; display:flex; flex-direction:column; gap:10px; margin-bottom:28px; }',
+  '.price-list li { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:#94a3b8; }',
+  '.chk { color:#22c55e; font-weight:700; flex-shrink:0; }',
+  '.price-btn { width:100%; padding:13px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:block; text-align:center; transition:transform .15s,box-shadow .15s; }',
+  '.price-btn-main { background:linear-gradient(135deg,#185FA5,#3b82f6); color:#fff; border:none; box-shadow:0 4px 16px rgba(59,130,246,.25); }',
+  '.price-btn-main:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(59,130,246,.4); }',
+  '.price-btn-ghost { background:transparent; color:#3b82f6; border:2px solid rgba(59,130,246,.35); }',
+  '.price-btn-ghost:hover { border-color:#3b82f6; background:rgba(59,130,246,.08); }',
+
+  // TESTIMONIALS
+  '.testi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }',
+  '.testi-card { background:rgba(14,26,45,.7); border:1px solid rgba(24,95,165,.15); border-radius:14px; padding:28px; transition:border-color .2s; }',
+  '.testi-card:hover { border-color:rgba(59,130,246,.3); }',
+  '.testi-stars { color:#f59e0b; font-size:13px; margin-bottom:12px; letter-spacing:2px; }',
+  '.testi-card p { font-size:14px; color:#94a3b8; line-height:1.75; margin-bottom:18px; font-style:italic; }',
+  '.testi-author { display:flex; align-items:center; gap:12px; }',
+  '.testi-avatar { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#185FA5,#3b82f6); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; flex-shrink:0; }',
+  '.testi-name { font-size:13px; font-weight:600; color:#e2e8f0; }',
+  '.testi-role { font-size:11px; color:#64748b; margin-top:1px; }',
+
+  // SOCIAL SECTION
+  '.social-section { background:rgba(14,26,45,.8); padding:72px 24px; text-align:center; border-top:1px solid rgba(24,95,165,.2); border-bottom:1px solid rgba(24,95,165,.2); }',
+  '.social-bar { display:flex; justify-content:center; gap:14px; flex-wrap:wrap; margin-top:36px; }',
+  '.social-btn { display:flex; align-items:center; gap:10px; padding:14px 24px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; transition:transform .15s,box-shadow .15s; border:none; cursor:pointer; white-space:nowrap; }',
+  '.social-btn:hover { transform:translateY(-3px); }',
+  '.s-phone { background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; box-shadow:0 4px 20px rgba(34,197,94,.25); }',
+  '.s-phone:hover { box-shadow:0 8px 28px rgba(34,197,94,.4); }',
+  '.s-email { background:linear-gradient(135deg,#185FA5,#3b82f6); color:#fff; box-shadow:0 4px 20px rgba(59,130,246,.25); }',
+  '.s-email:hover { box-shadow:0 8px 28px rgba(59,130,246,.4); }',
+  '.s-ig { background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); color:#fff; box-shadow:0 4px 20px rgba(220,39,67,.25); }',
+  '.s-ig:hover { box-shadow:0 8px 28px rgba(220,39,67,.4); }',
+  '.s-fb { background:linear-gradient(135deg,#1565c0,#1877f2); color:#fff; box-shadow:0 4px 20px rgba(24,119,242,.25); }',
+  '.s-fb:hover { box-shadow:0 8px 28px rgba(24,119,242,.4); }',
+
+  // CTA
+  '.cta-section { padding:100px 24px; text-align:center; background:radial-gradient(ellipse 60% 50% at 50% 50%,rgba(24,95,165,.2) 0%,transparent 70%),#070d1a; position:relative; overflow:hidden; }',
+  '.cta-glow { position:absolute; inset:0; background:radial-gradient(circle at 50% 50%,rgba(59,130,246,.08),transparent 70%); pointer-events:none; }',
+  '.cta-h2 { font-size:clamp(28px,4vw,50px); font-weight:900; color:#f1f5f9; margin-bottom:16px; letter-spacing:-.5px; position:relative; }',
+  '.cta-h2 .grad { background:linear-gradient(135deg,#60a5fa,#3b82f6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }',
+  '.cta-sub { font-size:17px; color:#64748b; margin-bottom:40px; max-width:480px; margin-left:auto; margin-right:auto; line-height:1.75; position:relative; }',
+  '.cta-btns { display:flex; justify-content:center; gap:14px; flex-wrap:wrap; position:relative; }',
+  '.cta-note { margin-top:18px; font-size:12px; color:#334155; position:relative; }',
+
+  // FOOTER
+  'footer { background:#040912; padding:56px 24px 32px; border-top:1px solid rgba(24,95,165,.15); }',
+  '.footer-inner { max-width:1200px; margin:0 auto; }',
+  '.footer-top { display:flex; justify-content:space-between; gap:40px; flex-wrap:wrap; margin-bottom:40px; }',
+  '.footer-logo-text { font-size:16px; font-weight:800; color:#e2e8f0; }',
+  '.footer-logo-sub { font-size:10px; color:#334155; }',
+  '.footer-brand-desc { font-size:13px; color:#334155; line-height:1.7; margin-top:12px; max-width:240px; }',
+  '.footer-col h4 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:#475569; margin-bottom:14px; }',
+  '.footer-col ul { list-style:none; display:flex; flex-direction:column; gap:8px; }',
+  '.footer-col a { font-size:13px; color:#334155; text-decoration:none; transition:color .15s; }',
+  '.footer-col a:hover { color:#94a3b8; }',
+  '.footer-bottom { border-top:1px solid rgba(255,255,255,.04); padding-top:20px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12px; color:#1e293b; }',
+
+  // DIVIDER
+  '.divider { border:none; border-top:1px solid rgba(24,95,165,.15); }',
+
+  // MOBILE
+  '@media (max-width:900px) {',
+  '  .hero-inner { grid-template-columns:1fr; gap:40px; }',
+  '  .mockup-wrap { display:none; }',
+  '  .ai-inner { grid-template-columns:1fr; gap:40px; }',
+  '  .steps-flow { gap:32px; }',
+  '  .step-item:not(:last-child)::after { display:none; }',
+  '}',
+  '@media (max-width:768px) {',
+  '  .nav-links,.nav-cta { display:none; }',
+  '  .nav-mobile-btn { display:block; }',
+  '  .stat-item { padding:0 24px; }',
+  '  .stat-item:not(:last-child)::after { display:none; }',
+  '  .footer-top { flex-direction:column; gap:32px; }',
   '}',
 ].join('\n')
 
+// ─── DASHBOARD MOCKUP DATA ────────────────────────────────────────────────────
+const MOCK_ROWS = [
+  { nome: 'João Silva Santos',    evento: 'S-2220', status: 'ok',   label: 'Transmitido' },
+  { nome: 'Ana Paula Ferreira',   evento: 'S-2240', status: 'pend', label: 'Pendente' },
+  { nome: 'Carlos Eduardo Lima',  evento: 'S-2210', status: 'ok',   label: 'Transmitido' },
+  { nome: 'Fernanda Rocha',       evento: 'S-2220', status: 'new',  label: 'Novo ASO' },
+  { nome: 'Roberto Mendes',       evento: 'S-2240', status: 'ok',   label: 'Transmitido' },
+]
+
+// ─── COUNTER COMPONENT ────────────────────────────────────────────────────────
+function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
+  const [count, setCount] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+  const started = useRef(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !started.current) {
+        started.current = true
+        const dur = 1600
+        const steps = 60
+        const inc = target / steps
+        let cur = 0
+        const timer = setInterval(() => {
+          cur = Math.min(cur + inc, target)
+          setCount(Math.round(cur))
+          if (cur >= target) clearInterval(timer)
+        }, dur / steps)
+      }
+    }, { threshold: 0.5 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [target])
+
+  return <div ref={ref} className="stat-num">{count}{suffix}</div>
+}
+
+// ─── COMPONENT ───────────────────────────────────────────────────────────────
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [aiStep, setAiStep] = useState(0)
+
+  // Animate AI demo steps
+  useEffect(() => {
+    const t = setInterval(() => setAiStep(s => (s + 1) % 3), 2200)
+    return () => clearInterval(t)
+  }, [])
 
   return (
     <>
       <Head>
         <title>eSocial SST — Transmissão automática com IA</title>
-        <meta name="description" content="Transmita os eventos SST do eSocial (S-2210, S-2220, S-2221, S-2240) com inteligência artificial. Leia PDF de LTCAT, PCMSO e ASO automaticamente. Trial gratuito de 14 dias." />
+        <meta name="description" content="Transmita os eventos SST do eSocial (S-2210, S-2220, S-2221, S-2240) com inteligência artificial. Leia PDF de LTCAT, PCMSO e ASO automaticamente." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta property="og:title" content="eSocial SST — Transmissão automática com IA" />
         <meta property="og:description" content="Transmita os eventos SST do eSocial com IA. Leia PDF de LTCAT, PCMSO e ASO automaticamente." />
@@ -156,7 +289,7 @@ export default function Home() {
         <style dangerouslySetInnerHTML={{ __html: globalCSS }} />
       </Head>
 
-      {/* NAV */}
+      {/* ── NAV ── */}
       <nav>
         <div className="nav-inner">
           <a href="#" className="nav-logo">
@@ -176,398 +309,388 @@ export default function Home() {
             <a href="#ia">IA &amp; Documentos</a>
             <a href="#funcionalidades">Funcionalidades</a>
             <a href="#precos">Preços</a>
+            <a href="#contato">Contato</a>
           </div>
           <div className="nav-cta">
-            <a href="/" className="btn-outline">Entrar</a>
-            <a href="/cadastro" className="btn-primary">Testar grátis</a>
+            <a href="/" className="btn-ghost">Entrar</a>
+            <a href="/cadastro" className="btn-nav-cta">Testar grátis →</a>
           </div>
           <button className="nav-mobile-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
               <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
           </button>
         </div>
         {menuOpen && (
-          <div style={{ background:'#fff', borderTop:'1px solid #e5e7eb', padding:'16px 24px', display:'flex', flexDirection:'column', gap:16 }}>
-            <a href="#eventos" style={{ fontSize:14, color:'#374151', textDecoration:'none' }} onClick={() => setMenuOpen(false)}>Eventos SST</a>
-            <a href="#ia" style={{ fontSize:14, color:'#374151', textDecoration:'none' }} onClick={() => setMenuOpen(false)}>IA &amp; Documentos</a>
-            <a href="#funcionalidades" style={{ fontSize:14, color:'#374151', textDecoration:'none' }} onClick={() => setMenuOpen(false)}>Funcionalidades</a>
-            <a href="#precos" style={{ fontSize:14, color:'#374151', textDecoration:'none' }} onClick={() => setMenuOpen(false)}>Preços</a>
-            <div style={{ display:'flex', gap:10 }}>
-              <a href="/" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'9px', fontSize:13, fontWeight:500, color:'#374151', border:'1px solid #d1d5db', borderRadius:8 }}>Entrar</a>
-              <a href="/cadastro" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'9px', fontSize:13, fontWeight:600, color:'#fff', background:'#185FA5', borderRadius:8 }}>Testar grátis</a>
+          <div style={{ background:'#070d1a', borderTop:'1px solid rgba(24,95,165,.2)', padding:'16px 24px', display:'flex', flexDirection:'column', gap:16 }}>
+            {['#eventos','#ia','#funcionalidades','#precos','#contato'].map((href,i) => (
+              <a key={i} href={href} style={{ fontSize:14, color:'#94a3b8', textDecoration:'none' }} onClick={() => setMenuOpen(false)}>
+                {['Eventos SST','IA & Documentos','Funcionalidades','Preços','Contato'][i]}
+              </a>
+            ))}
+            <div style={{ display:'flex', gap:10, paddingTop:8, borderTop:'1px solid rgba(255,255,255,.06)' }}>
+              <a href="/" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', fontSize:13, fontWeight:500, color:'#94a3b8', border:'1px solid rgba(255,255,255,.1)', borderRadius:8 }}>Entrar</a>
+              <a href="/cadastro" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', fontSize:13, fontWeight:600, color:'#fff', background:'linear-gradient(135deg,#185FA5,#3b82f6)', borderRadius:8 }}>Testar grátis</a>
             </div>
           </div>
         )}
       </nav>
 
-      {/* HERO */}
+      {/* ── HERO ── */}
       <section className="hero">
-        <div className="hero-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
-          Powered by Inteligência Artificial
+        <div className="hero-inner">
+          {/* Left */}
+          <div>
+            <div className="hero-badge">
+              <span className="badge-dot"></span>
+              Sistema ao vivo · 100% conforme eSocial
+            </div>
+            <h1>
+              Transmita o<br />
+              <span className="grad">eSocial SST</span><br />
+              com Inteligência Artificial
+            </h1>
+            <p className="hero-sub">
+              Envie os eventos S-2210, S-2220, S-2221 e S-2240 diretamente ao governo.
+              Importe PDF de LTCAT, PCMSO e ASO — a IA extrai e preenche tudo automaticamente.
+            </p>
+            <div className="hero-btns">
+              <a href="/cadastro" className="btn-cta-main">
+                Começar trial grátis
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9,18 15,12 9,6"/></svg>
+              </a>
+              <a href="#ia" className="btn-cta-sec">Ver como funciona</a>
+            </div>
+            <p className="hero-note">
+              <span>14 dias grátis</span> · Sem cartão · Cancele quando quiser
+            </p>
+          </div>
+
+          {/* Right — Dashboard Mockup */}
+          <div className="mockup-wrap">
+            <div className="mockup">
+              <div className="mockup-bar">
+                <div className="mock-dot" style={{ background:'#ef4444' }}></div>
+                <div className="mock-dot" style={{ background:'#f59e0b' }}></div>
+                <div className="mock-dot" style={{ background:'#22c55e' }}></div>
+                <span className="mockup-title">eSocial SST — Dashboard</span>
+              </div>
+              <div className="mockup-body">
+                <div className="mock-stats">
+                  <div className="mock-stat-card">
+                    <div className="mock-stat-num">47</div>
+                    <div className="mock-stat-label">Transmitidos</div>
+                  </div>
+                  <div className="mock-stat-card">
+                    <div className="mock-stat-num" style={{ color:'#fbbf24' }}>3</div>
+                    <div className="mock-stat-label">Pendentes</div>
+                  </div>
+                  <div className="mock-stat-card">
+                    <div className="mock-stat-num" style={{ color:'#4ade80' }}>12</div>
+                    <div className="mock-stat-label">Hoje</div>
+                  </div>
+                </div>
+                <div className="mock-table-header">
+                  <span>Funcionário</span>
+                  <span>Evento</span>
+                  <span>Status</span>
+                </div>
+                {MOCK_ROWS.map((row, i) => (
+                  <div key={i} className="mock-row">
+                    <span className="mock-nome">{row.nome}</span>
+                    <span className="mock-evento">{row.evento}</span>
+                    <span className={`mock-badge mock-badge-${row.status}`}>{row.label}</span>
+                  </div>
+                ))}
+                <div className="mock-ai-bar">
+                  <div className="mock-ai-dot"></div>
+                  IA aguardando próximo documento PDF...
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <h1>
-          Transmissão eSocial SST<br />
-          <span>simples, rápida e com IA</span>
-        </h1>
-        <p>
-          Envie os eventos S-2210, S-2220, S-2221 e S-2240 diretamente ao governo.
-          Importe PDF de LTCAT, PCMSO e ASO — a IA extrai os dados automaticamente.
-        </p>
-        <div className="hero-btns">
-          <a href="/cadastro" className="btn-hero-primary">
-            Começar trial grátis
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="9,18 15,12 9,6"/>
-            </svg>
-          </a>
-          <a href="#ia" className="btn-hero-outline">Ver como funciona</a>
-        </div>
-        <p className="hero-note">14 dias grátis · Sem cartão de crédito · Cancele quando quiser</p>
       </section>
 
-      {/* STATS */}
-      <div className="stats-bar">
+      {/* ── STATS ── */}
+      <div className="stats-section">
         <div className="stats-inner">
-          <div className="stat"><div className="stat-num">4</div><div className="stat-label">Eventos SST suportados</div></div>
-          <div className="stat"><div className="stat-num">3</div><div className="stat-label">Documentos lidos por IA</div></div>
-          <div className="stat"><div className="stat-num">14</div><div className="stat-label">Dias grátis no trial</div></div>
-          <div className="stat"><div className="stat-num">100%</div><div className="stat-label">Conforme normas eSocial</div></div>
+          {[
+            { target:4,   suffix:'',  label:'Eventos SST suportados' },
+            { target:3,   suffix:'',  label:'Documentos lidos por IA' },
+            { target:14,  suffix:'d', label:'Trial gratuito' },
+            { target:100, suffix:'%', label:'Conforme eSocial' },
+          ].map((s,i) => (
+            <div key={i} className="stat-item">
+              <Counter target={s.target} suffix={s.suffix} />
+              <div className="stat-label">{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* EVENTOS SST */}
+      {/* ── EVENTOS SST ── */}
       <section id="eventos">
-        <div className="section">
-          <div className="section-label">Eventos SST</div>
-          <h2 className="section-title">Todos os eventos de saúde e segurança do trabalho</h2>
-          <p className="section-desc">Transmita cada obrigação SST diretamente ao eSocial, com validação automática antes do envio.</p>
+        <div className="section-wrap" style={{ textAlign:'center' }}>
+          <div className="section-tag">Eventos SST</div>
+          <h2 className="section-h2">Todos os eventos de <span className="grad">saúde e segurança</span></h2>
+          <p className="section-desc">Transmita cada obrigação SST diretamente ao eSocial com validação automática antes do envio.</p>
           <div className="events-grid">
-            <div className="event-card">
-              <div className="event-badge">S-2210</div>
-              <h3>Comunicação de Acidente de Trabalho</h3>
-              <p>Registro e transmissão de CAT com todos os campos exigidos pela legislação. Notificação automática de prazos.</p>
-            </div>
-            <div className="event-card">
-              <div className="event-badge">S-2220</div>
-              <h3>Monitoramento de Saúde do Trabalhador</h3>
-              <p>ASO completo com vínculo ao funcionário, tipo de exame, médico responsável e validade automática.</p>
-            </div>
-            <div className="event-card">
-              <div className="event-badge">S-2221</div>
-              <h3>Exame Toxicológico do Motorista</h3>
-              <p>Exame toxicológico de longa janela para motoristas profissionais, conforme Lei 12.619/2012.</p>
-            </div>
-            <div className="event-card">
-              <div className="event-badge">S-2240</div>
-              <h3>Condições Ambientais do Trabalho</h3>
-              <p>Agentes nocivos, EPIs, EPCs, LTCAT e fatores de risco registrados por função e ambiente.</p>
-            </div>
+            {[
+              { code:'S-2210', title:'Comunicação de Acidente', desc:'Registro e transmissão de CAT com todos os campos exigidos. Notificação automática de prazos.' },
+              { code:'S-2220', title:'Monitoramento de Saúde', desc:'ASO completo vinculado ao funcionário, tipo de exame, médico responsável e validade automática.' },
+              { code:'S-2221', title:'Exame Toxicológico', desc:'Exame toxicológico de longa janela para motoristas profissionais, conforme Lei 12.619/2012.' },
+              { code:'S-2240', title:'Condições Ambientais', desc:'Agentes nocivos, EPIs, EPCs e LTCAT registrados por função. S-2240 só emitido para admissão, mudança, retorno e demissão.' },
+            ].map((ev,i) => (
+              <div key={i} className="event-card">
+                <div className="event-code">{ev.code}</div>
+                <h3>{ev.title}</h3>
+                <p>{ev.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       <hr className="divider" />
 
-      {/* AI SECTION */}
-      <section id="ia" className="ai-section">
+      {/* ── IA SECTION ── */}
+      <section id="ia" className="ai-bg">
         <div className="ai-inner">
           <div>
-            <div className="ai-label">Inteligência Artificial</div>
-            <h2 className="ai-title">Importe um PDF.<br />A IA faz o resto.</h2>
+            <div className="ai-tag">Inteligência Artificial</div>
+            <h2 className="ai-h2">
+              Importe um PDF.<br />
+              <span className="grad">A IA faz o resto.</span>
+            </h2>
             <p className="ai-desc">
-              Envie o arquivo PDF do LTCAT, PCMSO ou ASO. Nosso sistema usa Claude (Anthropic) para ler o documento, identificar o tipo e preencher todos os campos automaticamente.
+              Envie qualquer PDF de LTCAT, PCMSO ou ASO. O sistema usa Claude (Anthropic) para identificar o tipo, extrair os dados e preencher os campos automaticamente.
             </p>
-            <div className="ai-features">
-              <div className="ai-feature">
-                <div className="ai-feature-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
-                  </svg>
+            <div className="ai-steps">
+              {[
+                { icon:'📄', title:'Carregue o PDF', desc:'Arraste ou selecione o arquivo. Suporte a qualquer formato de ASO, LTCAT ou PCMSO.' },
+                { icon:'🤖', title:'IA analisa e extrai', desc:'Claude lê o documento, identifica campos e extrai dados com alta precisão.' },
+                { icon:'📡', title:'Transmita ao eSocial', desc:'Dados preenchidos automaticamente. Revise e clique em transmitir.' },
+              ].map((step,i) => (
+                <div key={i} className="ai-step" style={{ opacity: aiStep === i ? 1 : 0.45, transition:'opacity .4s' }}>
+                  <div className="ai-step-icon">
+                    <span style={{ fontSize:16 }}>{step.icon}</span>
+                  </div>
+                  <div className="ai-step-text">
+                    <h4>{step.title}</h4>
+                    <p>{step.desc}</p>
+                  </div>
                 </div>
-                <div className="ai-feature-text">
-                  <h4>LTCAT — Laudo Técnico</h4>
-                  <p>Extrai agentes nocivos, intensidade, metodologia e conclusões do laudo.</p>
-                </div>
-              </div>
-              <div className="ai-feature">
-                <div className="ai-feature-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/>
-                  </svg>
-                </div>
-                <div className="ai-feature-text">
-                  <h4>PCMSO — Programa de Saúde</h4>
-                  <p>Identifica médico coordenador, vigência, exames requeridos e cronograma.</p>
-                </div>
-              </div>
-              <div className="ai-feature">
-                <div className="ai-feature-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                  </svg>
-                </div>
-                <div className="ai-feature-text">
-                  <h4>ASO — Atestado de Saúde</h4>
-                  <p>Lê nome, CPF, função, médico, CRM, resultado e data do exame ocupacional.</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
           <div>
-            <div className="ai-card">
-              <div className="ai-card-header">
-                <div className="ai-dot" style={{ background:'#ef4444' }}></div>
-                <div className="ai-dot" style={{ background:'#f59e0b' }}></div>
-                <div className="ai-dot" style={{ background:'#22c55e' }}></div>
-                <span style={{ marginLeft:8, fontSize:12, color:'rgba(255,255,255,0.4)' }}>IA extraindo dados do PDF...</span>
+            <div className="ai-terminal">
+              <div className="ai-terminal-bar">
+                <div style={{ width:10, height:10, borderRadius:'50%', background:'#ef4444' }}></div>
+                <div style={{ width:10, height:10, borderRadius:'50%', background:'#f59e0b' }}></div>
+                <div style={{ width:10, height:10, borderRadius:'50%', background:'#22c55e' }}></div>
+                <span style={{ marginLeft:8, fontSize:11, color:'#475569', fontFamily:'monospace' }}>claude-extractor · processando...</span>
               </div>
-              <div className="ai-doc">
-                <div className="ai-doc-title">PCMSO — Extraído por IA</div>
-                <div className="ai-doc-row"><span>Empresa:</span><span className="ai-doc-val">Metalúrgica Alfa Ltda</span></div>
-                <div className="ai-doc-row"><span>Médico:</span><span className="ai-doc-val">Dr. Roberto Lima</span></div>
-                <div className="ai-doc-row"><span>CRM:</span><span className="ai-doc-val">SP-42891</span></div>
-                <div className="ai-doc-row"><span>Vigência:</span><span className="ai-doc-val">Jan/2025 — Dez/2025</span></div>
-              </div>
-              <div className="ai-doc">
-                <div className="ai-doc-title">ASO — Extraído por IA</div>
-                <div className="ai-doc-row"><span>Funcionário:</span><span className="ai-doc-val">João Silva Santos</span></div>
-                <div className="ai-doc-row"><span>Tipo de exame:</span><span className="ai-doc-val">Periódico</span></div>
-                <div className="ai-doc-row"><span>Resultado:</span><span className="ai-doc-val">Apto</span></div>
-                <div className="ai-doc-row"><span>Próximo exame:</span><span className="ai-doc-val">15/03/2026</span></div>
-              </div>
-              <div className="ai-status">
-                <div className="ai-status-dot"></div>
-                Dados validados — prontos para transmitir ao eSocial
+              <div className="ai-terminal-body">
+                <div className="ai-file-card" style={{ opacity: aiStep === 0 ? 1 : 0.5, transition:'opacity .4s' }}>
+                  <div className="ai-file-title">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+                    Arquivo recebido
+                  </div>
+                  <div className="ai-field"><span>Arquivo:</span><span className="ai-field-val">ASO_joao_silva.pdf</span></div>
+                  <div className="ai-field"><span>Tamanho:</span><span className="ai-field-val">248 KB</span></div>
+                  <div className="ai-field"><span>Tipo detectado:</span><span className="ai-field-val" style={{ color:'#4ade80' }}>ASO — Admissional</span></div>
+                </div>
+                <div className="ai-file-card" style={{ opacity: aiStep === 1 ? 1 : 0.5, transition:'opacity .4s' }}>
+                  <div className="ai-file-title">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    Extração por IA
+                  </div>
+                  <div className="ai-field"><span>Funcionário:</span><span className="ai-field-val">João Silva Santos</span></div>
+                  <div className="ai-field"><span>CPF:</span><span className="ai-field-val">123.456.789-00</span></div>
+                  <div className="ai-field"><span>Médico:</span><span className="ai-field-val">Dr. Roberto Lima</span></div>
+                  <div className="ai-field"><span>CRM:</span><span className="ai-field-val">SP-42891</span></div>
+                  <div className="ai-field"><span>Resultado:</span><span className="ai-field-val" style={{ color:'#4ade80' }}>Apto</span></div>
+                </div>
+                <div className="ai-status-bar" style={{ opacity: aiStep === 2 ? 1 : 0.5, transition:'opacity .4s' }}>
+                  <div style={{ width:8, height:8, background:'#22c55e', borderRadius:'50%', animation:'pulse-dot 1.5s infinite' }}></div>
+                  Pronto para transmitir ao eSocial gov.br
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FUNCIONALIDADES */}
+      {/* ── FUNCIONALIDADES ── */}
       <section id="funcionalidades" className="features-bg">
-        <div className="section" style={{ paddingTop:0 }}>
-          <div className="section-label">Funcionalidades</div>
-          <h2 className="section-title">Tudo que você precisa para cumprir o eSocial SST</h2>
-          <p className="section-desc">Uma plataforma completa para médicos do trabalho, engenheiros de segurança e RH.</p>
+        <div className="section-wrap" style={{ textAlign:'center' }}>
+          <div className="section-tag">Funcionalidades</div>
+          <h2 className="section-h2">Tudo para <span className="grad">cumprir o eSocial SST</span></h2>
+          <p className="section-desc">Plataforma completa para médicos do trabalho, engenheiros de segurança e RH.</p>
           <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
+            {[
+              { bg:'rgba(24,95,165,.2)', ic:'#60a5fa', svg:<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>, title:'Transmissão gov.br', desc:'Envio direto ao ambiente de produção do eSocial com certificado digital A1/A3. Retorno de recibo automático.' },
+              { bg:'rgba(168,85,247,.2)', ic:'#c084fc', svg:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>, title:'Multi-empresa', desc:'Gerencie várias empresas com um único login. Ideal para escritórios de SST e prestadores de serviço.' },
+              { bg:'rgba(34,197,94,.15)', ic:'#4ade80', svg:<><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></>, title:'Alertas de vencimento', desc:'Receba e-mail sobre ASOs próximos do vencimento antes do prazo acabar.' },
+              { bg:'rgba(251,191,36,.15)', ic:'#fbbf24', svg:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></>, title:'Painel administrativo', desc:'Visão completa do SaaS: clientes, planos, uso de IA, transmissões e status do sistema.' },
+              { bg:'rgba(249,115,22,.15)', ic:'#fb923c', svg:<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></>, title:'Cadastro de funcionários', desc:'Base centralizada com CPF, função, CBO, setor e histórico de exames de toda a empresa.' },
+              { bg:'rgba(20,184,166,.15)', ic:'#2dd4bf', svg:<polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>, title:'Histórico de transmissões', desc:'Consulte todos os eventos enviados, recibos do eSocial, XML gerado e status de cada envio.' },
+            ].map((f,i) => (
+              <div key={i} className="feat-card">
+                <div className="feat-icon" style={{ background:f.bg }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={f.ic} strokeWidth="2">{f.svg}</svg>
+                </div>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
               </div>
-              <h3>Transmissão gov.br</h3>
-              <p>Envio direto ao ambiente de produção do eSocial com certificado digital A1/A3. Retorno de recibo automático.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2">
-                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                </svg>
-              </div>
-              <h3>Multi-empresa</h3>
-              <p>Gerencie várias empresas com um único login. Ideal para escritórios de SST e prestadores de serviço.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2">
-                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
-                </svg>
-              </div>
-              <h3>Alertas de vencimento</h3>
-              <p>Receba notificações por e-mail sobre ASOs próximos do vencimento. Nunca mais perca um prazo.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
-                </svg>
-              </div>
-              <h3>Painel administrativo</h3>
-              <p>Visão completa do SaaS: clientes, planos, uso de IA, transmissões realizadas e status do sistema.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2">
-                  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/>
-                  <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
-                </svg>
-              </div>
-              <h3>Cadastro de funcionários</h3>
-              <p>Base centralizada com CPF, função, CBO, setor e histórico de exames de toda a empresa.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2">
-                  <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
-                </svg>
-              </div>
-              <h3>Histórico de transmissões</h3>
-              <p>Consulte todos os eventos enviados, recibos do eSocial, XML gerado e status de cada transmissão.</p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* COMO FUNCIONA */}
-      <section>
-        <div className="section">
-          <div className="section-label">Como funciona</div>
-          <h2 className="section-title">Em 4 passos simples</h2>
-          <p className="section-desc">Do cadastro à transmissão em minutos, sem necessidade de conhecimento técnico em XML.</p>
-          <div className="steps-grid">
-            <div className="step"><div className="step-num">1</div><h3>Crie sua conta</h3><p>Trial gratuito de 14 dias. Cadastre sua empresa e funcionários em minutos.</p></div>
-            <div className="step"><div className="step-num">2</div><h3>Importe ou preencha</h3><p>Envie um PDF ou preencha os dados do evento SST diretamente no sistema.</p></div>
-            <div className="step"><div className="step-num">3</div><h3>Valide com a IA</h3><p>A inteligência artificial verifica os dados e sugere correções antes do envio.</p></div>
-            <div className="step"><div className="step-num">4</div><h3>Transmita ao eSocial</h3><p>Clique em transmitir. O sistema assina, envia ao gov.br e salva o recibo automaticamente.</p></div>
+      {/* ── COMO FUNCIONA ── */}
+      <section className="how-bg">
+        <div className="section-wrap" style={{ textAlign:'center' }}>
+          <div className="section-tag">Como funciona</div>
+          <h2 className="section-h2">Em <span className="grad">4 passos</span> simples</h2>
+          <p className="section-desc">Do cadastro à transmissão em minutos, sem conhecimento técnico em XML.</p>
+          <div className="steps-flow">
+            {[
+              { n:'1', title:'Crie sua conta', desc:'Trial gratuito de 14 dias. Cadastre empresa e funcionários.' },
+              { n:'2', title:'Importe ou preencha', desc:'Envie um PDF ou preencha o evento SST manualmente.' },
+              { n:'3', title:'Valide com a IA', desc:'A IA verifica os dados e aponta inconsistências.' },
+              { n:'4', title:'Transmita', desc:'Assina, envia ao gov.br e salva o recibo automaticamente.' },
+            ].map((s,i) => (
+              <div key={i} className="step-item">
+                <div className="step-circle">{s.n}</div>
+                <h3>{s.title}</h3>
+                <p>{s.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       <hr className="divider" />
 
-      {/* PRICING */}
+      {/* ── PREÇOS ── */}
       <section id="precos" className="pricing-bg">
-        <div className="section" style={{ paddingTop:0 }}>
-          <div className="section-label">Planos</div>
-          <h2 className="section-title">Simples e transparente</h2>
-          <p className="section-desc">Comece grátis e escolha o plano ideal para o tamanho da sua operação.</p>
+        <div className="section-wrap" style={{ textAlign:'center' }}>
+          <div className="section-tag">Planos</div>
+          <h2 className="section-h2">Simples e <span className="grad">transparente</span></h2>
+          <p className="section-desc">Comece grátis e escolha o plano ideal para sua operação.</p>
           <div className="pricing-grid">
+            {/* Starter */}
             <div className="price-card">
               <div className="price-plan">Starter</div>
               <div className="price-amount">R$ 97<span>/mês</span></div>
               <p className="price-desc">Para empresas com até 50 funcionários e 1 usuário.</p>
-              <ul className="price-features">
-                <li><span className="check">✓</span>Todos os eventos SST (S-2210 a S-2240)</li>
-                <li><span className="check">✓</span>Leitura de PDF por IA (LTCAT, PCMSO, ASO)</li>
-                <li><span className="check">✓</span>Transmissão direta ao gov.br</li>
-                <li><span className="check">✓</span>Alertas de vencimento por e-mail</li>
-                <li><span className="check">✓</span>Histórico completo de transmissões</li>
+              <ul className="price-list">
+                {['Todos os eventos SST (S-2210 a S-2240)','Leitura de PDF por IA','Transmissão direta ao gov.br','Alertas de vencimento por e-mail','Histórico de transmissões'].map((item,i) => (
+                  <li key={i}><span className="chk">✓</span>{item}</li>
+                ))}
               </ul>
-              <a href="/cadastro" className="price-btn price-btn-outline">Começar grátis</a>
+              <a href="/cadastro" className="price-btn price-btn-ghost">Começar grátis</a>
             </div>
+            {/* Pro */}
             <div className="price-card featured">
-              <div className="price-badge">Mais popular</div>
+              <div className="price-pill">Mais popular</div>
               <div className="price-plan">Profissional</div>
               <div className="price-amount">R$ 197<span>/mês</span></div>
-              <p className="price-desc">Para escritórios de SST com múltiplas empresas e equipes.</p>
-              <ul className="price-features">
-                <li><span className="check">✓</span>Tudo do Starter</li>
-                <li><span className="check">✓</span>Multi-empresa ilimitado</li>
-                <li><span className="check">✓</span>Até 5 usuários por empresa</li>
-                <li><span className="check">✓</span>Convite de colaboradores</li>
-                <li><span className="check">✓</span>Suporte prioritário</li>
-                <li><span className="check">✓</span>Exportação de relatórios</li>
+              <p className="price-desc">Para escritórios de SST com múltiplas empresas.</p>
+              <ul className="price-list">
+                {['Tudo do Starter','Multi-empresa ilimitado','Até 5 usuários por empresa','Convite de colaboradores','Suporte prioritário','Exportação de relatórios'].map((item,i) => (
+                  <li key={i}><span className="chk">✓</span>{item}</li>
+                ))}
               </ul>
-              <a href="/cadastro" className="price-btn price-btn-filled">Começar grátis</a>
+              <a href="/cadastro" className="price-btn price-btn-main">Começar grátis</a>
             </div>
+            {/* Contact */}
             <div className="price-card">
               <div className="price-plan">Dúvidas ou cotação?</div>
-              <div className="price-amount" style={{ fontSize:24, lineHeight:1.2 }}>Fale<br/>conosco</div>
-              <p className="price-desc">Entre em contato pelo canal de sua preferência. Respondemos rápido!</p>
-              <ul className="price-features">
-                <li>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{flexShrink:0,marginTop:1}}>
-                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-                  </svg>
-                  <a href="tel:+5564992090277" style={{color:'#374151',textDecoration:'none'}}>(64) 99209-0277</a>
-                </li>
-                <li>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{flexShrink:0,marginTop:1}}>
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-                  </svg>
-                  <a href="mailto:dseg.sst@gmail.com" style={{color:'#374151',textDecoration:'none'}}>dseg.sst@gmail.com</a>
-                </li>
-                <li>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{flexShrink:0,marginTop:1}}>
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-                  </svg>
-                  <a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer" style={{color:'#374151',textDecoration:'none'}}>@dseg.sst</a>
-                </li>
-                <li>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{flexShrink:0,marginTop:1}}>
-                    <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>
-                  </svg>
-                  <a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer" style={{color:'#374151',textDecoration:'none'}}>Dseg Consultoria</a>
-                </li>
+              <div className="price-amount" style={{ fontSize:26, lineHeight:1.2 }}>Fale<br/>conosco</div>
+              <p className="price-desc">Entre em contato pelo canal que preferir. Respondemos rápido!</p>
+              <ul className="price-list">
+                {[
+                  { href:'tel:+5564992090277', label:'(64) 99209-0277' },
+                  { href:'mailto:dseg.sst@gmail.com', label:'dseg.sst@gmail.com' },
+                  { href:'https://instagram.com/dseg.sst', label:'@dseg.sst' },
+                  { href:'https://web.facebook.com/profile.php?id=61565545266445', label:'Dseg Consultoria' },
+                ].map((c,i) => (
+                  <li key={i}>
+                    <span className="chk">→</span>
+                    <a href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" style={{ color:'#94a3b8', textDecoration:'none' }}>{c.label}</a>
+                  </li>
+                ))}
               </ul>
-              <a href="tel:+5564992090277" className="price-btn price-btn-outline">Ligar agora</a>
+              <a href="tel:+5564992090277" className="price-btn price-btn-ghost">Ligar agora</a>
             </div>
           </div>
-          <p style={{ textAlign:'center', marginTop:28, fontSize:13, color:'#9ca3af' }}>
-            Todos os planos incluem 14 dias grátis · Sem contrato de fidelidade · Cancele quando quiser
+          <p style={{ textAlign:'center', marginTop:28, fontSize:12, color:'#334155' }}>
+            Todos os planos incluem 14 dias grátis · Sem contrato · Cancele quando quiser
           </p>
         </div>
       </section>
 
-      {/* DEPOIMENTOS */}
+      {/* ── DEPOIMENTOS ── */}
       <section>
-        <div className="section">
-          <div className="section-label">Depoimentos</div>
-          <h2 className="section-title">Quem já usa o eSocial SST</h2>
-          <p className="section-desc">Profissionais de SST em todo o Brasil economizando horas por semana.</p>
-          <div className="testimonials-grid">
-            <div className="testimonial">
-              <div className="testimonial-stars">★★★★★</div>
-              <p>"Antes eu gastava horas preenchendo XML manualmente. Com o eSocial SST importo o PDF do ASO e em segundos está tudo pronto para transmitir. Incrível."</p>
-              <div className="testimonial-author">
-                <div className="testimonial-avatar">MC</div>
-                <div><div className="testimonial-name">Márcia C.</div><div className="testimonial-role">Médica do Trabalho · São Paulo</div></div>
+        <div className="section-wrap" style={{ textAlign:'center' }}>
+          <div className="section-tag">Depoimentos</div>
+          <h2 className="section-h2">Quem já usa o <span className="grad">eSocial SST</span></h2>
+          <p className="section-desc">Profissionais de SST economizando horas por semana em todo o Brasil.</p>
+          <div className="testi-grid">
+            {[
+              { init:'MC', nome:'Márcia C.', role:'Médica do Trabalho · São Paulo', text:'Antes gastava horas preenchendo XML. Agora importo o PDF do ASO e em segundos está pronto para transmitir. Incrível.' },
+              { init:'RF', nome:'Ricardo F.', role:'Engenheiro de Segurança · Curitiba', text:'Gerencio 12 empresas aqui. O multi-empresa é perfeito — cada uma isolada mas acesso tudo com um login só.' },
+              { init:'PS', nome:'Patricia S.', role:'Analista de RH · Belo Horizonte', text:'O alerta de vencimento de ASO salvou minha empresa de uma autuação. O sistema avisou 30 dias antes.' },
+            ].map((t,i) => (
+              <div key={i} className="testi-card">
+                <div className="testi-stars">★★★★★</div>
+                <p>"{t.text}"</p>
+                <div className="testi-author">
+                  <div className="testi-avatar">{t.init}</div>
+                  <div>
+                    <div className="testi-name">{t.nome}</div>
+                    <div className="testi-role">{t.role}</div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="testimonial">
-              <div className="testimonial-stars">★★★★★</div>
-              <p>"Gerencio 12 empresas clientes aqui. O multi-empresa é perfeito, cada uma isolada mas eu acesso tudo com um login só. O suporte também é excelente."</p>
-              <div className="testimonial-author">
-                <div className="testimonial-avatar">RF</div>
-                <div><div className="testimonial-name">Ricardo F.</div><div className="testimonial-role">Engenheiro de Segurança · Curitiba</div></div>
-              </div>
-            </div>
-            <div className="testimonial">
-              <div className="testimonial-stars">★★★★★</div>
-              <p>"O alerta de vencimento de ASO salvou minha empresa de uma autuação. O sistema mandou o e-mail 30 dias antes e conseguimos regularizar a tempo."</p>
-              <div className="testimonial-author">
-                <div className="testimonial-avatar">PS</div>
-                <div><div className="testimonial-name">Patricia S.</div><div className="testimonial-role">Analista de RH · Belo Horizonte</div></div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* REDES SOCIAIS */}
-      <section className="social-section">
-        <div className="section-label">Fale conosco</div>
-        <h2 className="section-title" style={{ marginBottom:8 }}>Estamos nas redes sociais</h2>
-        <p style={{ fontSize:15, color:'#6b7280', maxWidth:480, margin:'0 auto', lineHeight:1.7 }}>
-          Dúvidas, suporte ou quer conhecer mais? Entre em contato pelo canal que preferir.
+      {/* ── REDES SOCIAIS ── */}
+      <section id="contato" className="social-section">
+        <div className="section-tag">Fale conosco</div>
+        <h2 className="section-h2" style={{ marginBottom:8 }}>
+          Estamos nas <span className="grad">redes sociais</span>
+        </h2>
+        <p style={{ fontSize:15, color:'#64748b', maxWidth:460, margin:'0 auto', lineHeight:1.75 }}>
+          Tire dúvidas, peça suporte ou conheça mais sobre a Dseg Consultoria.
         </p>
         <div className="social-bar">
-          <a href="tel:+5564992090277" className="social-btn social-btn-phone">
+          <a href="tel:+5564992090277" className="social-btn s-phone">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
             </svg>
             (64) 99209-0277
           </a>
-          <a href="mailto:dseg.sst@gmail.com" className="social-btn social-btn-email">
+          <a href="mailto:dseg.sst@gmail.com" className="social-btn s-email">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
             </svg>
             dseg.sst@gmail.com
           </a>
-          <a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer" className="social-btn social-btn-ig">
+          <a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer" className="social-btn s-ig">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
             </svg>
             @dseg.sst
           </a>
-          <a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer" className="social-btn social-btn-fb">
+          <a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer" className="social-btn s-fb">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>
             </svg>
@@ -576,24 +699,29 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="cta-bg">
-        <h2 className="cta-title">Comece seu trial grátis hoje</h2>
-        <p className="cta-desc">14 dias para explorar todas as funcionalidades. Sem cartão de crédito, sem compromisso.</p>
+      {/* ── CTA ── */}
+      <section className="cta-section">
+        <div className="cta-glow"></div>
+        <h2 className="cta-h2">
+          Comece seu trial<br /><span className="grad">grátis hoje</span>
+        </h2>
+        <p className="cta-sub">
+          14 dias para explorar todas as funcionalidades. Sem cartão de crédito, sem compromisso.
+        </p>
         <div className="cta-btns">
-          <a href="/cadastro" className="btn-cta-white">Criar conta grátis</a>
-          <a href="/" className="btn-cta-outline">Já tenho conta — entrar</a>
+          <a href="/cadastro" className="btn-cta-main">Criar conta grátis</a>
+          <a href="/" className="btn-cta-sec">Já tenho conta — entrar</a>
         </div>
-        <p className="cta-note">Suporte por e-mail em até 24h · Dados hospedados no Brasil</p>
+        <p className="cta-note">Suporte em até 24h · Dados hospedados no Brasil · LGPD</p>
       </section>
 
-      {/* FOOTER */}
+      {/* ── FOOTER ── */}
       <footer>
         <div className="footer-inner">
           <div className="footer-top">
-            <div className="footer-brand">
+            <div>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <div style={{ width:36, height:36, background:'#185FA5', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <div style={{ width:36, height:36, background:'linear-gradient(135deg,#185FA5,#3b82f6)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 14px rgba(59,130,246,.3)' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
                     <path d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
                     <polyline points="14,3 14,8 19,8"/>
@@ -601,12 +729,12 @@ export default function Home() {
                 </div>
                 <div>
                   <div className="footer-logo-text">eSocial SST</div>
-                  <div className="footer-logo-sub">Transmissor inteligente</div>
+                  <div className="footer-logo-sub">Dseg Consultoria · Transmissor inteligente</div>
                 </div>
               </div>
-              <p>Plataforma SaaS para transmissão de eventos SST ao eSocial com inteligência artificial.</p>
+              <p className="footer-brand-desc">Plataforma SaaS para transmissão de eventos SST ao eSocial com inteligência artificial.</p>
             </div>
-            <div className="footer-links">
+            <div className="footer-col">
               <h4>Produto</h4>
               <ul>
                 <li><a href="#eventos">Eventos SST</a></li>
@@ -615,7 +743,7 @@ export default function Home() {
                 <li><a href="#precos">Preços</a></li>
               </ul>
             </div>
-            <div className="footer-links">
+            <div className="footer-col">
               <h4>Conta</h4>
               <ul>
                 <li><a href="/">Entrar</a></li>
@@ -623,19 +751,19 @@ export default function Home() {
                 <li><a href="/dashboard">Dashboard</a></li>
               </ul>
             </div>
-            <div className="footer-links">
+            <div className="footer-col">
               <h4>Contato</h4>
               <ul>
                 <li><a href="tel:+5564992090277">(64) 99209-0277</a></li>
                 <li><a href="mailto:dseg.sst@gmail.com">dseg.sst@gmail.com</a></li>
-                <li><a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+                <li><a href="https://instagram.com/dseg.sst" target="_blank" rel="noopener noreferrer">Instagram @dseg.sst</a></li>
                 <li><a href="https://web.facebook.com/profile.php?id=61565545266445" target="_blank" rel="noopener noreferrer">Facebook</a></li>
               </ul>
             </div>
           </div>
           <div className="footer-bottom">
-            <p suppressHydrationWarning>© {new Date().getFullYear()} eSocial SST — Dseg Consultoria. Todos os direitos reservados.</p>
-            <p>Desenvolvido no Brasil 🇧🇷</p>
+            <span suppressHydrationWarning>© {new Date().getFullYear()} eSocial SST — Dseg Consultoria. Todos os direitos reservados.</span>
+            <span>Desenvolvido no Brasil 🇧🇷</span>
           </div>
         </div>
       </footer>
