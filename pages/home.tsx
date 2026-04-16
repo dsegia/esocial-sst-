@@ -210,20 +210,103 @@ const globalCSS = [
   // DIVIDER
   '.divider { border:none; border-top:1px solid rgba(24,95,165,.15); }',
 
-  // MOBILE
+  // ── TABLET ──────────────────────────────────────────────────────────────────
   '@media (max-width:900px) {',
-  '  .hero-inner { grid-template-columns:1fr; gap:40px; }',
+  '  .hero-inner { grid-template-columns:1fr; gap:32px; text-align:center; }',
   '  .mockup-wrap { display:none; }',
-  '  .ai-inner { grid-template-columns:1fr; gap:40px; }',
-  '  .steps-flow { gap:32px; }',
+  '  .hero-sub { margin:0 auto 32px; }',
+  '  .hero-btns { justify-content:center; }',
+  '  .hero-note { text-align:center; }',
+  '  .ai-inner { grid-template-columns:1fr; gap:36px; }',
+  '  .steps-flow { gap:24px; }',
   '  .step-item:not(:last-child)::after { display:none; }',
   '}',
+
+  // ── MOBILE 768px ──────────────────────────────────────────────────────────
   '@media (max-width:768px) {',
   '  .nav-links,.nav-cta { display:none; }',
   '  .nav-mobile-btn { display:block; }',
-  '  .stat-item { padding:0 24px; }',
+  '  .nav-inner { padding:0 16px; }',
+
+  // Hero
+  '  .hero { padding:72px 16px 48px; min-height:auto; }',
+  '  .hero h1 { font-size:32px; letter-spacing:-.5px; }',
+  '  .hero-btns { flex-direction:column; align-items:stretch; gap:10px; }',
+  '  .btn-cta-main,.btn-cta-sec { text-align:center; justify-content:center; width:100%; padding:14px 20px; font-size:15px; }',
+
+  // Stats — 2×2 grid
+  '  .stats-inner { display:grid; grid-template-columns:1fr 1fr; gap:0; }',
+  '  .stat-item { padding:20px 16px; }',
   '  .stat-item:not(:last-child)::after { display:none; }',
-  '  .footer-top { flex-direction:column; gap:32px; }',
+  '  .stat-item:nth-child(1),.stat-item:nth-child(2) { border-bottom:1px solid rgba(24,95,165,.2); }',
+  '  .stat-item:nth-child(1),.stat-item:nth-child(3) { border-right:1px solid rgba(24,95,165,.2); }',
+  '  .stat-num { font-size:30px; }',
+
+  // Sections
+  '  .section-wrap { padding:52px 16px; }',
+  '  .section-h2 { font-size:24px; }',
+  '  .section-desc { font-size:14px; margin-bottom:36px; }',
+  '  .section-tag { font-size:10px; }',
+
+  // Events
+  '  .events-grid { grid-template-columns:1fr; gap:12px; }',
+  '  .event-card { padding:20px; }',
+
+  // AI section
+  '  .ai-bg { padding:52px 0; }',
+  '  .ai-inner { padding:0 16px; gap:28px; }',
+  '  .ai-h2 { font-size:26px; }',
+  '  .ai-terminal-body { padding:14px; }',
+  '  .ai-file-card { padding:12px; }',
+
+  // Features
+  '  .features-grid { grid-template-columns:1fr; gap:12px; }',
+  '  .feat-card { padding:22px; }',
+
+  // How it works — stack vertical
+  '  .steps-flow { flex-direction:column; align-items:center; gap:0; }',
+  '  .step-item { min-width:unset; width:100%; max-width:320px; padding:0 16px 28px; }',
+  '  .step-item:last-child { padding-bottom:0; }',
+
+  // Pricing
+  '  .pricing-grid { grid-template-columns:1fr; gap:14px; max-width:100%; }',
+  '  .price-card { padding:24px; }',
+  '  .price-amount { font-size:34px; }',
+
+  // Testimonials
+  '  .testi-grid { grid-template-columns:1fr; gap:12px; }',
+  '  .testi-card { padding:22px; }',
+
+  // Social
+  '  .social-section { padding:52px 16px; }',
+  '  .social-bar { flex-direction:column; align-items:stretch; gap:10px; margin-top:28px; }',
+  '  .social-btn { justify-content:center; padding:14px 20px; font-size:14px; border-radius:12px; }',
+
+  // CTA
+  '  .cta-section { padding:64px 16px; }',
+  '  .cta-h2 { font-size:28px; }',
+  '  .cta-sub { font-size:15px; }',
+  '  .cta-btns { flex-direction:column; align-items:stretch; gap:10px; }',
+  '  .cta-btns .btn-cta-main,.cta-btns .btn-cta-sec { justify-content:center; }',
+
+  // Footer
+  '  .footer-top { flex-direction:column; gap:28px; }',
+  '  footer { padding:40px 16px 24px; }',
+  '  .footer-bottom { flex-direction:column; align-items:center; gap:6px; text-align:center; }',
+  '}',
+
+  // ── SMALL MOBILE 480px ────────────────────────────────────────────────────
+  '@media (max-width:480px) {',
+  '  .hero h1 { font-size:28px; }',
+  '  .hero-sub { font-size:14px; }',
+  '  .hero-badge { font-size:11px; }',
+  '  .stat-num { font-size:26px; }',
+  '  .stat-label { font-size:11px; }',
+  '  .section-h2 { font-size:22px; }',
+  '  .ai-h2 { font-size:22px; }',
+  '  .cta-h2 { font-size:24px; }',
+  '  .price-amount { font-size:30px; }',
+  '  .step-circle { width:42px; height:42px; font-size:16px; }',
   '}',
 ].join('\n')
 
