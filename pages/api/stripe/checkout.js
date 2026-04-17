@@ -13,12 +13,17 @@ const PLANOS = {
   professional: {
     nome: 'Professional',
     priceId: process.env.STRIPE_PRICE_PROFESSIONAL,
-    descricao: 'Até 200 funcionários, multi-empresa',
+    descricao: 'Até 300 funcionários, multi-empresa',
+  },
+  pro: {
+    nome: 'Professional',
+    priceId: process.env.STRIPE_PRICE_PROFESSIONAL,
+    descricao: 'Até 300 funcionários, multi-empresa',
   },
   business: {
     nome: 'Business',
     priceId: process.env.STRIPE_PRICE_BUSINESS,
-    descricao: 'Funcionários ilimitados, suporte prioritário',
+    descricao: 'Até 1.000 funcionários, suporte prioritário',
   },
 }
 
@@ -45,8 +50,14 @@ export default async function handler(req, res) {
 
   const { plano } = req.body
   const planoInfo = PLANOS[plano]
-  if (!planoInfo) return res.status(400).json({ erro: 'Plano inválido. Use: starter, professional, business' })
-  if (!planoInfo.priceId) return res.status(500).json({ erro: `STRIPE_PRICE_${plano.toUpperCase()} não configurado` })
+  if (!planoInfo) {
+    console.error('[checkout] plano inválido recebido:', plano)
+    return res.status(400).json({ erro: `Plano inválido: "${plano}". Use: starter, professional, business` })
+  }
+  if (!planoInfo.priceId) {
+    console.error('[checkout] priceId não configurado para plano:', plano)
+    return res.status(500).json({ erro: `Variável STRIPE_PRICE_${plano.toUpperCase()} não configurada no servidor` })
+  }
 
   // Busca ou cria customer Stripe vinculado à empresa
   const stripe = new Stripe(stripeKey, { apiVersion: '2024-04-10' })
