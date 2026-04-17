@@ -671,7 +671,7 @@ export default function Home() {
               <div className="price-amount">R$ 167<span>/mês</span></div>
               <p className="price-desc">Para empresas com até 50 funcionários.</p>
               <ul className="price-list">
-                {['Até 50 funcionários','ASO, LTCAT e PCMSO ilimitados','Importação por IA (PDF)','Transmissão eSocial S-2210/2220/2221/2240','Alertas de vencimento','Exportação de PDF'].map((item,i) => (
+                {['Até 50 funcionários','ASO, LTCAT e PCMSO ilimitados','Importação por IA (PDF)','Transmissão eSocial S-2210 ao S-2240','Alertas de vencimento','Exportação de PDF'].map((item,i) => (
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
