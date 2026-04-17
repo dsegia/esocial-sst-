@@ -2,6 +2,55 @@
 // Assina XML com XMLDSig ICP-Brasil usando certificado A1
 // O .pfx e a senha NUNCA são armazenados — usados apenas em memória
 
+// Extrai o elemento a ser assinado e propaga namespaces do pai (<eSocial>).
+// O XMLDSig Reference URI="#id" exige que o digest cubra apenas esse elemento
+// com as declarações de namespace propagadas (C14N §2.3).
+function extrairElementoParaDigest(xml, elemId, tagEvento) {
+  const tagName = tagEvento && tagEvento !== 'eSocial' ? tagEvento : null
+  if (!tagName) {
+    // Fallback: remove só a declaração XML e usa o documento inteiro
+    return xml.replace(/<\?xml[^?]*\?>\s*/, '')
+  }
+
+  // Encontrar a tag de abertura do elemento com o Id correto
+  const openTagRegex = new RegExp(`<${tagName}(\\s[^>]*)?>`)
+  const openTagMatch = xml.match(openTagRegex)
+  if (!openTagMatch) return xml.replace(/<\?xml[^?]*\?>\s*/, '')
+
+  const startPos = xml.indexOf(openTagMatch[0])
+  const closeTag = `</${tagName}>`
+  const endPos = xml.lastIndexOf(closeTag) + closeTag.length
+  let elemento = xml.substring(startPos, endPos)
+
+  // Coletar declarações xmlns do elemento raiz <eSocial ...>
+  const eSocialMatch = xml.match(/<eSocial(\s[^>]*)?>/)
+  if (eSocialMatch && eSocialMatch[1]) {
+    const parentNs = [...eSocialMatch[1].matchAll(/xmlns(?::\w+)?="[^"]*"/g)].map(m => m[0])
+    const elemNs = new Set([...openTagMatch[0].matchAll(/xmlns(?::\w+)?="[^"]*"/g)].map(m => m[0]))
+    const missingNs = parentNs.filter(ns => !elemNs.has(ns))
+
+    if (missingNs.length > 0) {
+      // Inserir namespaces faltantes ANTES dos atributos regulares (C14N: xmlns antes de attrs)
+      // Coletar todos os atributos do openTag e reordenar: xmlns* primeiro, depois o resto
+      const allAttrMatches = [...openTagMatch[0].matchAll(/(?:xmlns(?::\w+)?|[\w:]+)="[^"]*"/g)].map(m => m[0])
+      const existingNsAttrs = allAttrMatches.filter(a => a.startsWith('xmlns'))
+      const regularAttrs = allAttrMatches.filter(a => !a.startsWith('xmlns'))
+      const allNs = [...new Set([...missingNs, ...existingNsAttrs])]
+      // Ordenar: xmlns (default) primeiro, depois xmlns:prefix alfabeticamente
+      allNs.sort((a, b) => {
+        if (a.startsWith('xmlns=') && !b.startsWith('xmlns=')) return -1
+        if (!a.startsWith('xmlns=') && b.startsWith('xmlns=')) return 1
+        return a.localeCompare(b)
+      })
+      regularAttrs.sort((a, b) => a.split('=')[0].localeCompare(b.split('=')[0]))
+      const newOpenTag = `<${tagName} ${[...allNs, ...regularAttrs].join(' ')}>`
+      elemento = newOpenTag + elemento.slice(openTagMatch[0].length)
+    }
+  }
+
+  return elemento
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
 
@@ -49,15 +98,19 @@ export default async function handler(req, res) {
     const idMatch = xml.match(/Id="([^"]+)"/)
     const elemId = idMatch ? idMatch[1] : 'signed-element'
 
-    // 3. Canonicalização C14N do XML (simplificada para ICP-Brasil)
-    // Remove espaços extras e normaliza o XML
+    // 3. Normalizar linha e remover declaração XML
     const xmlLimpo = xml
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
 
-    // 4. Calcular digest SHA-1 do XML canonicalizado
+    // 4. Extrair o elemento referenciado pelo Id para calcular o digest
+    // O Reference URI="#elemId" exige que o digest seja calculado APENAS
+    // sobre o elemento com esse Id, não sobre o XML inteiro.
+    // Também é necessário propagar os namespaces do elemento pai (<eSocial>).
+    const xmlParaDigest = extrairElementoParaDigest(xmlLimpo, elemId, tagAssinatura)
+
     const md = forge.md.sha1.create()
-    md.update(forge.util.encodeUtf8(xmlLimpo))
+    md.update(forge.util.encodeUtf8(xmlParaDigest))
     const digestB64 = forge.util.encode64(md.digest().getBytes())
 
     // 5. Construir o SignedInfo

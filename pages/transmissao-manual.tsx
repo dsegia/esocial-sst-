@@ -94,8 +94,14 @@ export default function TransmissaoManual() {
       try {
         // 1. Buscar dados completos da transmissão
         const { data: txCompleta } = await supabase.from('transmissoes')
-          .select(`*, funcionarios(nome, cpf, matricula_esocial), asos(*), ltcats(*)`)
+          .select(`*, funcionarios(nome, cpf, matricula_esocial), asos(*), ltcats(*), cats(*)`)
           .eq('id', txId).single()
+
+        // Mapear dados conforme referencia_tipo
+        let dadosEvento = null
+        if (txCompleta.referencia_tipo === 'aso') dadosEvento = txCompleta.asos
+        else if (txCompleta.referencia_tipo === 'ltcat') dadosEvento = txCompleta.ltcats
+        else if (txCompleta.referencia_tipo === 'cat') dadosEvento = txCompleta.cats
 
         // 2. Gerar XML
         const xmlResp = await fetch('/api/xml-generator', {
@@ -103,8 +109,9 @@ export default function TransmissaoManual() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             tipo: txCompleta.evento,
-            dados: txCompleta.referencia_tipo === 'aso' ? txCompleta.asos : txCompleta.ltcats,
-            empresa: { cnpj: empresa.cnpj }
+            dados: dadosEvento,
+            empresa: { cnpj: empresa.cnpj },
+            ambiente,
           })
         })
         const xmlData = await xmlResp.json()

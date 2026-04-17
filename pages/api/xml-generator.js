@@ -4,14 +4,17 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
 
-  const { tipo, dados, empresa } = req.body
+  const { tipo, dados, empresa, ambiente = 'producao_restrita' } = req.body
   if (!tipo || !dados || !empresa) return res.status(400).json({ erro: 'Dados incompletos' })
+
+  // tpAmb: 1=Produção, 2=Produção Restrita (testes)
+  const tpAmb = ambiente === 'producao' ? '1' : '2'
 
   try {
     let xml = ''
-    if (tipo === 'S-2220') xml = gerarS2220(dados, empresa)
-    else if (tipo === 'S-2240') xml = gerarS2240(dados, empresa)
-    else if (tipo === 'S-2210') xml = gerarS2210(dados, empresa)
+    if (tipo === 'S-2220') xml = gerarS2220(dados, empresa, tpAmb)
+    else if (tipo === 'S-2240') xml = gerarS2240(dados, empresa, tpAmb)
+    else if (tipo === 'S-2210') xml = gerarS2210(dados, empresa, tpAmb)
     else return res.status(400).json({ erro: 'Tipo inválido' })
 
     return res.status(200).json({ sucesso: true, xml })
@@ -71,7 +74,7 @@ function codigoExame(nomeExame) {
 }
 
 // ─── S-2220: MONITORAMENTO DA SAÚDE ──────────────────
-function gerarS2220(aso, empresa) {
+function gerarS2220(aso, empresa, tpAmb) {
   const cnpjEmp = cnpj(empresa.cnpj)
   const idEvt = id(cnpjEmp)
   const func = aso.funcionario || {}
@@ -94,7 +97,7 @@ function gerarS2220(aso, empresa) {
   <evtMonit Id="${idEvt}">
     <ideEvento>
       <indRetif>1</indRetif>
-      <tpAmb>2</tpAmb>
+      <tpAmb>${tpAmb}</tpAmb>
       <procEmi>1</procEmi>
       <verProc>1.0.0</verProc>
     </ideEvento>
@@ -116,14 +119,14 @@ function gerarS2220(aso, empresa) {
         <ufCRM>${(dadosAso.medico_crm || '').split('-').pop()?.trim().replace(/\d/g,'') || 'SP'}</ufCRM>
       </medico>
       <concl>${CONCLUSAO[dadosAso.conclusao] || '1'}</concl>
-      ${dadosAso.prox_exame ? `<dscAtiv>Próximo exame previsto: ${data(dadosAso.prox_exame)}</dscAtiv>` : ''}
+      ${dadosAso.prox_exame ? `<obsAtiv>Próximo exame previsto: ${data(dadosAso.prox_exame)}</obsAtiv>` : ''}
     </aso>
   </evtMonit>
 </eSocial>`
 }
 
 // ─── S-2240: CONDIÇÕES AMBIENTAIS ────────────────────
-function gerarS2240(ltcat, empresa) {
+function gerarS2240(ltcat, empresa, tpAmb) {
   const cnpjEmp = cnpj(empresa.cnpj)
   const idEvt = id(cnpjEmp)
   const geral = ltcat.dados_gerais || {}
@@ -136,7 +139,7 @@ function gerarS2240(ltcat, empresa) {
         <agNoc>
           <tpAgt>${TIPO_AGENTE[ag.tipo] || '01'}</tpAgt>
           <dsAgt>${ag.nome}</dsAgt>
-          <nrInsc>${ag.valor || ''}</nrInsc>
+          ${ag.valor ? `<nrInsc>${ag.valor}</nrInsc>` : ''}
           <ltcat>
             <nrDocTec>${geral.resp_registro || ''}</nrDocTec>
             <ideOC>${geral.resp_conselho || 'CREA'}</ideOC>
@@ -168,7 +171,7 @@ function gerarS2240(ltcat, empresa) {
   <evtExpRisco Id="${idEvt}">
     <ideEvento>
       <indRetif>1</indRetif>
-      <tpAmb>2</tpAmb>
+      <tpAmb>${tpAmb}</tpAmb>
       <procEmi>1</procEmi>
       <verProc>1.0.0</verProc>
     </ideEvento>
@@ -192,12 +195,16 @@ function gerarS2240(ltcat, empresa) {
 }
 
 // ─── S-2210: CAT ─────────────────────────────────────
-function gerarS2210(cat, empresa) {
+function gerarS2210(cat, empresa, tpAmb) {
   const cnpjEmp = cnpj(empresa.cnpj)
   const idEvt = id(cnpjEmp)
   const func = cat.funcionario || {}
   const TIPO_CAT = { tipico: '1', doenca: '2', trajeto: '3' }
   const atend = cat.atendimento || {}
+  // diagProvavel deve ser texto descritivo, não o código CID
+  const descDiag = cat.descricao || cat.natureza_lesao || cat.cid || ''
+  // dtObito deve ser a data real do óbito (se informada) ou a data do acidente
+  const dtObito = cat.dt_obito ? data(cat.dt_obito) : data(cat.dt_acidente)
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtCAT/v_S_01_03_00"
@@ -205,7 +212,7 @@ function gerarS2210(cat, empresa) {
   <evtCAT Id="${idEvt}">
     <ideEvento>
       <indRetif>1</indRetif>
-      <tpAmb>2</tpAmb>
+      <tpAmb>${tpAmb}</tpAmb>
       <procEmi>1</procEmi>
       <verProc>1.0.0</verProc>
     </ideEvento>
@@ -223,9 +230,9 @@ function gerarS2210(cat, empresa) {
       <tpAcid>${TIPO_CAT[cat.tipo_cat] || '1'}</tpAcid>
       <dscLesao>${cat.natureza_lesao || ''}</dscLesao>
       <dscCompLesao>${cat.descricao || ''}</dscCompLesao>
-      <diagProvavel>${cat.cid}</diagProvavel>
+      <diagProvavel>${descDiag}</diagProvavel>
       <codCID>${cat.cid}</codCID>
-      ${cat.houve_morte ? '<infoObito><dtObito>9999-12-31</dtObito></infoObito>' : ''}
+      ${cat.houve_morte ? `<infoObito><dtObito>${dtObito}</dtObito></infoObito>` : ''}
       <atendimento>
         <dtAtendimento>${data(atend.data) || data(cat.dt_acidente)}</dtAtendimento>
         ${atend.hora ? `<hrAtendimento>${atend.hora}</hrAtendimento>` : ''}
