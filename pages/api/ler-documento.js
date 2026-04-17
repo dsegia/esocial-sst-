@@ -263,6 +263,18 @@ export const config = { api: { bodyParser: { sizeLimit: '20mb' } }, maxDuration:
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
 
+  // Verificar autenticação — impede consumo de créditos de IA por não autenticados
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) return res.status(401).json({ erro: 'Autenticação necessária' })
+  try {
+    const { createClient } = require('@supabase/supabase-js')
+    const sbAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    const { data: { user }, error } = await sbAuth.auth.getUser(token)
+    if (error || !user) return res.status(401).json({ erro: 'Sessão inválida ou expirada' })
+  } catch {
+    return res.status(401).json({ erro: 'Falha na verificação de autenticação' })
+  }
+
   const { paginas, texto_pdf, pdf_base64, tipo } = req.body
   const geminiKey    = process.env.GEMINI_API_KEY
   const anthropicKey = process.env.ANTHROPIC_API_KEY

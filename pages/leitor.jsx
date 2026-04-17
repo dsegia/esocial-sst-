@@ -246,9 +246,13 @@ export default function Leitor() {
         payload = { paginas, texto_pdf: '', tipo }
       }
 
+      const { data: { session } } = await supabase.auth.getSession()
       const resp = await fetch('/api/ler-documento', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify(payload)
       })
       let json

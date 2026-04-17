@@ -18,6 +18,7 @@ export default function TransmissaoManual() {
   const router = useRouter()
   const certRef = useRef()
   const [empresa, setEmpresa] = useState(null)
+  const [empresaId, setEmpresaId] = useState('')
   const [etapa, setEtapa] = useState('certificado')
   const [pendentes, setPendentes] = useState([])
   const [selecionados, setSelecionados] = useState([])
@@ -40,10 +41,11 @@ export default function TransmissaoManual() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/'); return }
     const { data: user } = await supabase.from('usuarios')
-      .select('empresa_id, empresas(razao_social, cnpj, cert_digital_validade, cert_titular)')
+      .select('empresa_id, empresas(razao_social, cnpj, cert_digital_validade, cert_titular, plano)')
       .eq('id', session.user.id).single()
     if (!user) { router.push('/'); return }
     setEmpresa(user.empresas)
+    setEmpresaId(user.empresa_id)
 
     const { data: txs } = await supabase.from('transmissoes')
       .select('id, evento, status, criado_em, funcionarios(nome, matricula_esocial)')
@@ -84,6 +86,38 @@ export default function TransmissaoManual() {
   async function transmitirSelecionados() {
     if (!selecionados.length) { setErro('Selecione ao menos uma transmissão.'); return }
     if (!pfxBase64 || !certSenha) { setErro('Certificado não carregado.'); return }
+
+    // Período de teste: limitar 1 transmissão enviada por tipo de evento
+    if (empresa?.plano === 'trial') {
+      const { data: jaEnviados } = await supabase.from('transmissoes')
+        .select('evento')
+        .eq('empresa_id', empresaId)
+        .eq('status', 'enviado')
+
+      const countEnviados: Record<string, number> = {}
+      for (const tx of (jaEnviados || [])) {
+        countEnviados[tx.evento] = (countEnviados[tx.evento] || 0) + 1
+      }
+
+      // Contar quantos de cada evento estão sendo selecionados agora
+      const countSelecionando: Record<string, number> = {}
+      for (const id of selecionados) {
+        const ev = pendentes.find(t => t.id === id)?.evento
+        if (ev) countSelecionando[ev] = (countSelecionando[ev] || 0) + 1
+      }
+
+      const bloqueados: string[] = []
+      for (const [evt, qtd] of Object.entries(countSelecionando)) {
+        if ((countEnviados[evt] || 0) >= 1) bloqueados.push(`${evt} (já enviado)`)
+        else if (qtd > 1) bloqueados.push(`${evt} (selecione apenas 1 por vez no trial)`)
+      }
+
+      if (bloqueados.length > 0) {
+        setErro(`Período de teste: limite de 1 transmissão por tipo de evento. Bloqueado: ${bloqueados.join(' | ')}`)
+        return
+      }
+    }
+
     setProcessando(true); setErro(''); setSucesso('')
     setEtapa('assinar')
 
