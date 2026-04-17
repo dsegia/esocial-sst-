@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      payment_method_types: ['card', 'boleto', 'pix'],
+      payment_method_types: ['card', 'boleto'],
       line_items: [{ price: planoInfo.priceId, quantity: 1 }],
       success_url: `${siteUrl}/dashboard?upgrade=ok&plano=${plano}`,
       cancel_url: `${siteUrl}/planos?cancelado=1`,
