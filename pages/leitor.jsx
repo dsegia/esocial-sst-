@@ -102,31 +102,88 @@ export default function Leitor() {
   async function lerXML(file) {
     const txt = await file.text()
     const doc = new DOMParser().parseFromString(txt, 'text/xml')
-    const get = tag => doc.querySelector(tag)?.textContent?.trim() || null
-    const tipoMap = {'0':'admissional','1':'periodico','2':'retorno','3':'mudanca','4':'demissional','5':'monitoracao'}
-    const concMap = {'1':'apto','2':'apto_restricao','3':'inapto'}
+
+    // Helpers namespace-safe (DOMParser com namespace pode quebrar querySelector)
+    const els  = (parent, tag) => [...parent.getElementsByTagName('*')].filter(e => e.localName === tag)
+    const el   = (parent, tag) => els(parent, tag)[0] || null
+    const get  = (parent, tag) => el(parent, tag)?.textContent?.trim() || null
 
     // Detectar tipo pelo XML
-    const isLTCAT = !!doc.querySelector('evtExpRisco')
-    if (isLTCAT) {
+    const isLTCAT = els(doc, 'evtExpRisco').length > 0
+    const isASO   = els(doc, 'evtMonit').length > 0
+
+    // ── S-2240: LTCAT ──────────────────────────────────────────
+    if (isLTCAT || tipoFixo === 'ltcat') {
+      const TIPO_AGT = { '01':'fis', '02':'qui', '03':'bio', '04':'erg' }
+
+      const iniValid = get(doc, 'iniValid') // ex: "2024-01"
+      const dataVigencia = iniValid ? iniValid + '-01' : null
+
+      const ghes = els(doc, 'infoAtiv').map((atv, idx) => {
+        const nomeGhe = get(atv, 'dscAtivDes') || `GHE ${idx + 1}`
+
+        const agentes = els(atv, 'agNoc').map(ag => {
+          const dscLtcat = get(ag, 'dscAtvDes') || ''
+          // Extrai valor/medição de "Nome — 85 dB(A)" → "85 dB(A)"
+          const valorMatch = dscLtcat.match(/[—–-]\s*(.+)$/)
+          return {
+            tipo:  TIPO_AGT[get(ag, 'tpAgt')] || 'fis',
+            nome:  get(ag, 'dsAgt') || '',
+            valor: valorMatch ? valorMatch[1].trim() : '',
+            limite: '',
+            supera_lt: false,
+          }
+        })
+
+        const epcEpiEl = el(atv, 'epcEpi')
+        const epis = epcEpiEl ? els(epcEpiEl, 'epi').map(e => ({
+          nome:  get(e, 'dscEPI') || '',
+          ca:    get(e, 'caEPI') || '',
+          eficaz: get(epcEpiEl, 'eficEpi') === 'S',
+        })) : []
+        const utilizEpc = get(epcEpiEl, 'utilizEpc') === 'S'
+        const eficEpc   = get(epcEpiEl, 'eficEpc')   === 'S'
+
+        return {
+          id: idx + 1,
+          nome: nomeGhe,
+          setor: '',
+          qtd_trabalhadores: 0,
+          aposentadoria_especial: false,
+          agentes,
+          epc: utilizEpc ? [{ nome: 'EPC instalado', eficaz: eficEpc }] : [],
+          epi: epis,
+        }
+      })
+
       return {
         tipo: 'ltcat',
         dados: {
           dados_gerais: {
-            data_emissao: null, data_vigencia: null, prox_revisao: null,
-            resp_nome: get('nmRespReg'), resp_conselho: get('ideOC'), resp_registro: get('nrOC')
+            data_emissao:  dataVigencia,
+            data_vigencia: dataVigencia,
+            prox_revisao:  null,
+            resp_nome:     get(doc, 'nmRespReg'),
+            resp_conselho: get(doc, 'ideOC'),
+            resp_registro: get(doc, 'nrOC'),
           },
-          ghes: [], confianca: { data_emissao: 99, resp_nome: 99, ghes: 70 }
+          ghes,
+          confianca: { data_emissao: 95, resp_nome: 95, ghes: 90 },
         }
       }
     }
 
+    // ── S-2220: ASO ────────────────────────────────────────────
+    const tipoMap = {'0':'admissional','1':'periodico','2':'retorno','3':'mudanca','4':'demissional','5':'monitoracao'}
+    const concMap = {'1':'apto','2':'apto_restricao','3':'inapto'}
+
     return {
       tipo: 'aso',
       dados: {
-        funcionario: { nome:get('nmTrab'), cpf:get('cpfTrab'), matricula:get('matricula'), funcao:null, setor:null, data_nasc:null, data_adm:null },
-        aso: { tipo_aso:tipoMap[get('tpAso')]||'periodico', data_exame:fmtData(get('dtAso')), prox_exame:null, conclusao:concMap[get('concl')]||'apto', medico_nome:get('nmMed'), medico_crm:get('nrCRM') },
-        exames:[], riscos:[], confianca:{ nome:99, cpf:99, tipo_aso:99, data_exame:99, conclusao:99 }
+        funcionario: { nome: get(doc,'nmTrab'), cpf: get(doc,'cpfTrab'), matricula: get(doc,'matricula'), funcao:null, setor:null, data_nasc:null, data_adm:null },
+        aso: { tipo_aso: tipoMap[get(doc,'tpAso')]||'periodico', data_exame: fmtData(get(doc,'dtAso')), prox_exame:null, conclusao: concMap[get(doc,'concl')]||'apto', medico_nome: get(doc,'nmMed'), medico_crm: get(doc,'nrCRM') },
+        exames: [], riscos: [],
+        confianca: { nome:99, cpf:99, tipo_aso:99, data_exame:99, conclusao:99 },
       }
     }
   }
@@ -259,7 +316,7 @@ export default function Leitor() {
 
       // ── LTCAT: salva diretamente na empresa, SEM funcionário ──
       if (tipoDetectado === 'ltcat') {
-        const { error } = await supabase.from('ltcats').insert({
+        const { data: ltcatSalvo, error } = await supabase.from('ltcats').insert({
           empresa_id: empresaId,
           data_emissao: converterData(d.dados_gerais?.data_emissao) || new Date().toISOString().split('T')[0],
           data_vigencia: converterData(d.dados_gerais?.data_vigencia) || new Date().toISOString().split('T')[0],
@@ -269,8 +326,19 @@ export default function Leitor() {
           resp_registro: d.dados_gerais?.resp_registro || null,
           ghes: d.ghes || [],
           ativo: true,
-        })
+        }).select().single()
         if (error) throw new Error(error.message)
+
+        // Criar transmissão S-2240 pendente
+        await supabase.from('transmissoes').insert({
+          empresa_id: empresaId,
+          evento: 'S-2240',
+          referencia_id: ltcatSalvo.id,
+          referencia_tipo: 'ltcat',
+          status: 'pendente',
+          tentativas: 0,
+          ambiente: 'producao_restrita',
+        })
         setEtapa('sucesso')
         return
       }
@@ -400,8 +468,8 @@ export default function Leitor() {
               : 'Leitor inteligente de documentos'}
           </div>
           <div style={s.sub}>
-            {tipoFixo === 'aso'   && 'ASO — PDF ou XML → extrair → confirmar → salvar'}
-            {tipoFixo === 'ltcat' && 'LTCAT — PDF → extrair GHEs e agentes → confirmar → salvar'}
+            {tipoFixo === 'aso'   && 'ASO — PDF ou XML eSocial → extrair → confirmar → salvar'}
+            {tipoFixo === 'ltcat' && 'LTCAT — PDF ou XML eSocial (S-2240) → extrair GHEs e agentes → confirmar → salvar'}
             {tipoFixo === 'pcmso' && 'PCMSO — PDF → extrair programas e exames → confirmar → salvar'}
           </div>
         </div>
@@ -457,7 +525,7 @@ export default function Leitor() {
               {arquivo ? arquivo.name : 'Clique ou arraste o arquivo aqui'}
             </div>
             <div style={{ fontSize:12, color:'#9ca3af', marginTop:4 }}>
-              PDF de ASO ou LTCAT · XML eSocial · Detectado automaticamente
+              PDF de ASO ou LTCAT · XML eSocial S-2220 / S-2240 · Detectado automaticamente
             </div>
             {arquivo && (
               <div style={{ marginTop:8, fontSize:12, color:'#185FA5', fontWeight:500 }}>
@@ -465,7 +533,7 @@ export default function Leitor() {
               </div>
             )}
           </div>
-          <input ref={inputRef} type="file" accept={tipoFixo === "aso" ? ".pdf,.xml" : ".pdf"} style={{ display:'none' }}
+          <input ref={inputRef} type="file" accept={tipoFixo === "pcmso" ? ".pdf" : ".pdf,.xml"} style={{ display:'none' }}
             onChange={e => setArquivo(e.target.files[0])} />
 
           {arquivo && (
@@ -477,7 +545,7 @@ export default function Leitor() {
 
           <div style={{ marginTop:12, padding:'10px 14px', background:'#f9fafb', borderRadius:8, fontSize:12, color:'#6b7280', lineHeight:1.9 }}>
             <strong>Detecção automática:</strong> o sistema identifica se é ASO ou LTCAT pelo conteúdo do documento —
-            não precisa selecionar. PDF digital → extração direta · PDF escaneado → análise visual com IA · XML eSocial → leitura direta
+            não precisa selecionar. PDF digital → extração direta · PDF escaneado → análise visual com IA · XML S-2220/S-2240 → leitura direta sem IA
           </div>
         </div>
       )}
@@ -618,8 +686,32 @@ export default function Leitor() {
                 {campoEdit('Nº Registro', dadosEditados.dados_gerais.resp_registro, 85, v => atualizarCampo('dados_gerais.resp_registro', v))}
               </div>
               {dadosEditados.ghes?.length > 0 && (
-                <div style={{ marginTop:8, padding:'8px 12px', background:'#f9fafb', borderRadius:8, fontSize:12, color:'#374151' }}>
-                  {dadosEditados.ghes.length} GHE(s) identificado(s) com {dadosEditados.ghes.reduce((a,g)=>a+(g.agentes?.length||0),0)} agente(s) de risco
+                <div style={{ marginTop:10 }}>
+                  <div style={s.secLabel}>{dadosEditados.ghes.length} GHE(s) identificado(s)</div>
+                  {dadosEditados.ghes.map((ghe, i) => (
+                    <div key={i} style={{ background:'#f9fafb', border:'0.5px solid #e5e7eb', borderRadius:8, padding:'8px 12px', marginBottom:6 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:'#374151', marginBottom:4 }}>{ghe.nome}</div>
+                      {ghe.agentes?.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                          {ghe.agentes.map((ag, j) => {
+                            const AGT_BG  = { fis:'#E6F1FB', qui:'#FAEEDA', bio:'#EAF3DE', erg:'#f3e8ff' }
+                            const AGT_COR = { fis:'#0C447C', qui:'#633806', bio:'#27500A', erg:'#6b21a8' }
+                            return (
+                              <span key={j} style={{ padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:500,
+                                background: AGT_BG[ag.tipo]||'#f3f4f6', color: AGT_COR[ag.tipo]||'#374151' }}>
+                                {ag.nome}{ag.valor ? ` — ${ag.valor}` : ''}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {ghe.epi?.length > 0 && (
+                        <div style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>
+                          EPIs: {ghe.epi.map(e => e.nome).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
