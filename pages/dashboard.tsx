@@ -155,7 +155,7 @@ export default function Dashboard() {
       tipo: 'info', icon: '🩺',
       titulo: `${semAso.length} funcionário(s) sem ASO`,
       desc: semAso.slice(0,2).map(x => x.nome.split(' ')[0]).join(', ') + (semAso.length > 2 ? ` +${semAso.length-2}` : ''),
-      acao: 'Importar ASO', rota: '/leitor?tipo=aso',
+      acao: 'Importar ASO', rota: '/leitor',
     })
 
     setAlertas(alertasLista)
