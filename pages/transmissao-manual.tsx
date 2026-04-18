@@ -145,16 +145,27 @@ export default function TransmissaoManual() {
     for (const txId of selecionados) {
       const tx = pendentes.find(t => t.id === txId)
       try {
-        // 1. Buscar dados completos da transmissão
-        const { data: txCompleta } = await supabase.from('transmissoes')
-          .select(`*, funcionarios(nome, cpf, matricula_esocial), asos(*), ltcats(*), cats(*)`)
+        // 1. Buscar transmissão e funcionário
+        const { data: txCompleta, error: errTx } = await supabase.from('transmissoes')
+          .select(`*, funcionarios(nome, cpf, matricula_esocial)`)
           .eq('id', txId).single()
 
-        // Mapear dados conforme referencia_tipo
+        if (errTx || !txCompleta) throw new Error('Transmissão não encontrada: ' + (errTx?.message || txId))
+
+        // 2. Buscar dados do evento conforme referencia_tipo + referencia_id
         let dadosEvento = null
-        if (txCompleta.referencia_tipo === 'aso') dadosEvento = txCompleta.asos
-        else if (txCompleta.referencia_tipo === 'ltcat') dadosEvento = txCompleta.ltcats
-        else if (txCompleta.referencia_tipo === 'cat') dadosEvento = txCompleta.cats
+        if (txCompleta.referencia_tipo === 'aso' && txCompleta.referencia_id) {
+          const { data } = await supabase.from('asos').select('*').eq('id', txCompleta.referencia_id).single()
+          dadosEvento = data
+        } else if (txCompleta.referencia_tipo === 'ltcat' && txCompleta.referencia_id) {
+          const { data } = await supabase.from('ltcats').select('*').eq('id', txCompleta.referencia_id).single()
+          dadosEvento = data
+        } else if (txCompleta.referencia_tipo === 'cat' && txCompleta.referencia_id) {
+          const { data } = await supabase.from('cats').select('*').eq('id', txCompleta.referencia_id).single()
+          dadosEvento = data
+        }
+
+        if (!dadosEvento) throw new Error(`Dados do evento não encontrados (tipo: ${txCompleta.referencia_tipo}, id: ${txCompleta.referencia_id})`)
 
         // 2. Gerar XML
         const xmlResp = await fetch('/api/xml-generator', {
