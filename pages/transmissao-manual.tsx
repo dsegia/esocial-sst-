@@ -28,6 +28,8 @@ export default function TransmissaoManual() {
   const [sucesso, setSucesso] = useState('')
   const [resultados, setResultados] = useState([])
   const [ambiente, setAmbiente] = useState('producao_restrita')
+  const [testando, setTestando] = useState(false)
+  const [testeResult, setTesteResult] = useState<null | { ok: boolean; msg: string; latencia?: number }>(null)
 
   // Certificado (nunca sai do estado do browser)
   const [certArquivo, setCertArquivo] = useState(null)
@@ -54,6 +56,23 @@ export default function TransmissaoManual() {
       .order('criado_em', { ascending: false })
     setPendentes(txs || [])
     setCarregando(false)
+  }
+
+  async function testarConexao() {
+    setTestando(true)
+    setTesteResult(null)
+    try {
+      const resp = await fetch(`/api/testar-conexao-esocial?ambiente=${ambiente}`)
+      const data = await resp.json()
+      if (data.conectado) {
+        setTesteResult({ ok: true, msg: `Conexão OK — Gov.br respondeu em ${data.latencia_ms}ms. ${data.descricao || ''}`, latencia: data.latencia_ms })
+      } else {
+        setTesteResult({ ok: false, msg: `Sem conexão: ${data.erro}` })
+      }
+    } catch {
+      setTesteResult({ ok: false, msg: 'Erro ao testar conexão com o servidor.' })
+    }
+    setTestando(false)
   }
 
   async function lerCertificado() {
@@ -250,12 +269,21 @@ export default function TransmissaoManual() {
           <div style={s.sub}>Assinar e transmitir eventos eSocial SST</div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <select style={{ ...s.input, width:'auto' }} value={ambiente} onChange={e => setAmbiente(e.target.value)}>
+          <select style={{ ...s.input, width:'auto' }} value={ambiente} onChange={e => { setAmbiente(e.target.value); setTesteResult(null) }}>
             <option value="producao_restrita">Produção Restrita (Testes)</option>
             <option value="producao">Produção (Real)</option>
           </select>
+          <button onClick={testarConexao} disabled={testando}
+            style={{ background:'#f0f4f8', border:'1px solid #cbd5e1', borderRadius:8, padding:'8px 14px', fontSize:12, cursor:'pointer', color:'#374151', whiteSpace:'nowrap' }}>
+            {testando ? 'Testando...' : '🔌 Testar conexão'}
+          </button>
         </div>
       </div>
+      {testeResult && (
+        <div style={{ background: testeResult.ok ? '#EAF3DE' : '#FCEBEB', border: `1px solid ${testeResult.ok ? '#C0DD97' : '#E24B4A'}`, borderRadius:10, padding:'10px 16px', fontSize:12, color: testeResult.ok ? '#2D6A00' : '#791F1F', marginBottom:14, fontWeight:500 }}>
+          {testeResult.ok ? '✅' : '❌'} {testeResult.msg}
+        </div>
+      )}
 
       {/* Aviso produção */}
       {ambiente === 'producao' && (
