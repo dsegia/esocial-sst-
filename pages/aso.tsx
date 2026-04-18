@@ -241,7 +241,7 @@ export default function Aso() {
             {asos.length} atestado(s) · {totalVencidos} vencido(s) · {totalVence30} vencem em 30 dias
           </div>
         </div>
-        <button onClick={() => router.push('/leitor')}
+        <button onClick={() => router.push('/importar')}
           style={{ padding:'8px 16px', background:'#185FA5', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer' }}>
           ↑ Importar ASO
         </button>
@@ -291,7 +291,7 @@ export default function Aso() {
           <div style={{ fontSize:32, marginBottom:8 }}>📋</div>
           <div style={{ fontSize:14, fontWeight:500, color:'#374151', marginBottom:6 }}>Nenhum ASO encontrado</div>
           <div style={{ fontSize:12, marginBottom:16 }}>Importe atestados de saúde via PDF</div>
-          <button onClick={() => router.push('/leitor')}
+          <button onClick={() => router.push('/importar')}
             style={{ padding:'8px 18px', background:'#185FA5', color:'#fff', border:'none', borderRadius:8, fontSize:13, cursor:'pointer' }}>
             ↑ Importar ASO
           </button>
