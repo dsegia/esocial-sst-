@@ -375,16 +375,7 @@ export default function Home() {
       <nav>
         <div className="nav-inner">
           <a href="#" className="nav-logo">
-            <div className="nav-logo-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-                <path d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
-                <polyline points="14,3 14,8 19,8"/>
-              </svg>
-            </div>
-            <div>
-              <div className="nav-logo-text">eSocial SST</div>
-              <div className="nav-logo-sub">Transmissor inteligente</div>
-            </div>
+            <img src="/logo-branca.png" alt="DSEG Consultoria" style={{ height:'38px', width:'auto' }} />
           </a>
           <div className="nav-links">
             <a href="#eventos">Eventos SST</a>
@@ -794,17 +785,8 @@ export default function Home() {
         <div className="footer-inner">
           <div className="footer-top">
             <div>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <div style={{ width:36, height:36, background:'linear-gradient(135deg,#185FA5,#3b82f6)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 14px rgba(59,130,246,.3)' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-                    <path d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
-                    <polyline points="14,3 14,8 19,8"/>
-                  </svg>
-                </div>
-                <div>
-                  <div className="footer-logo-text">eSocial SST</div>
-                  <div className="footer-logo-sub">Dseg Consultoria · Transmissor inteligente</div>
-                </div>
+              <div style={{ display:'flex', alignItems:'center' }}>
+                <img src="/logo-branca.png" alt="DSEG Consultoria" style={{ height:'38px', width:'auto' }} />
               </div>
               <p className="footer-brand-desc">Plataforma SaaS para transmissão de eventos SST ao eSocial com inteligência artificial.</p>
             </div>

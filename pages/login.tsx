@@ -97,16 +97,8 @@ export default function Login() {
           <div style={{ ...s.card, maxWidth: 520 }}>
 
             <div style={s.logoWrap}>
-              <div style={s.logoBox}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-                  <path d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
-                  <polyline points="14,3 14,8 19,8"/>
-                </svg>
-              </div>
-              <div>
-                <div style={s.logoTitle}>eSocial SST</div>
-                <div style={s.logoSub}>Olá, {nomeUser}</div>
-              </div>
+              <img src="/logo-completa.png" alt="DSEG Consultoria" style={{ height:'40px', width:'auto' }} />
+              <div style={{ ...s.logoSub, marginLeft:4 }}>Olá, {nomeUser}</div>
             </div>
 
             <div style={{ fontSize:14, fontWeight:600, color:'#111', marginBottom:4 }}>Selecionar empresa</div>
@@ -165,17 +157,8 @@ export default function Login() {
       <div style={s.page}>
         <div style={s.card}>
 
-          <div style={s.logoWrap}>
-            <div style={s.logoBox}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-                <path d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
-                <polyline points="14,3 14,8 19,8"/>
-              </svg>
-            </div>
-            <div>
-              <div style={s.logoTitle}>eSocial SST</div>
-              <div style={s.logoSub}>Transmissor · S-2210 · S-2220 · S-2240</div>
-            </div>
+          <div style={{ ...s.logoWrap, justifyContent:'center' }}>
+            <img src="/logo-completa.png" alt="DSEG Consultoria" style={{ height:'44px', width:'auto' }} />
           </div>
 
           <div style={{ fontSize:14, fontWeight:600, color:'#111', marginBottom:20 }}>Entrar no sistema</div>

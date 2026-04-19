@@ -75,17 +75,8 @@ export default function Layout({ children, pagina }) {
       <div style={{ width:230, flexShrink:0, background:'#fff', borderRight:'0.5px solid #e5e7eb', display:'flex', flexDirection:'column', padding:'1.25rem 0' }}>
 
         {/* Logo */}
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 1.25rem .75rem' }}>
-          <div style={{ width:32, height:32, background:'#185FA5', borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-              <path d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
-              <polyline points="14,3 14,8 19,8"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{ fontSize:12, fontWeight:600, color:'#111' }}>eSocial SST</div>
-            <div style={{ fontSize:10, color:'#9ca3af' }}>Transmissor v1.0</div>
-          </div>
+        <div style={{ padding:'0 1.25rem .75rem' }}>
+          <img src="/logo-completa.png" alt="DSEG Consultoria" style={{ height:'32px', width:'auto' }} />
         </div>
 
         {/* Empresa atual — clique abre /empresas */}
