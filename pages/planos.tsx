@@ -120,7 +120,12 @@ export default function Planos() {
 
   return (
     <Layout pagina="planos">
-      <Head><title>Planos — eSocial SST</title></Head>
+      <Head>
+        <title>Planos e Preços — eSocial SST Transmissor</title>
+        <meta name="description" content="Conheça os planos do eSocial SST Transmissor. Assine e transmita eventos SST (S-2220, S-2240, S-2221) com inteligência artificial a partir de R$ 167/mês." />
+        <meta property="og:title" content="Planos e Preços — eSocial SST Transmissor" />
+        <meta property="og:description" content="Transmita eventos SST ao eSocial com facilidade. Planos a partir de R$ 167/mês com trial gratuito de 14 dias." />
+      </Head>
 
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ textAlign:'center', marginBottom: 32 }}>

@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+Allow: /home
+Allow: /planos
+Allow: /cadastro
+
+Disallow: /dashboard
+Disallow: /funcionarios
+Disallow: /aso
+Disallow: /s2220
+Disallow: /s2221
+Disallow: /s2240
+Disallow: /s2210
+Disallow: /relatorios
+Disallow: /alertas
+Disallow: /configuracoes
+Disallow: /conta
+Disallow: /empresas
+Disallow: /admin
+Disallow: /importar
+Disallow: /historico
+Disallow: /transmissao-manual
+Disallow: /aceitar-convite
+
+Sitemap: https://esocial-sst.vercel.app/sitemap.xml
