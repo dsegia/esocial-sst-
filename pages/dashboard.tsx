@@ -217,7 +217,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs principais */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10, marginBottom:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
         {[
           {
             label:'Funcionários',
@@ -228,20 +228,12 @@ export default function Dashboard() {
             rota: '/funcionarios',
           },
           {
-            label:'Conformidade ASO',
-            valor: (kpis?.conformidade || 0) + '%',
-            sub: `${kpis?.asoEmDia || 0} de ${kpis?.totalFunc || 0} em dia`,
-            cor: (kpis?.conformidade || 0) >= 80 ? '#1D9E75' : (kpis?.conformidade || 0) >= 60 ? '#EF9F27' : '#E24B4A',
-            bg: (kpis?.conformidade || 0) >= 80 ? '#EAF3DE' : (kpis?.conformidade || 0) >= 60 ? '#FAEEDA' : '#FCEBEB',
-            rota: '/s2220',
-          },
-          {
             label:'ASOs vencidos',
             valor: kpis?.asoVencidos || 0,
             sub: `${kpis?.asoVence30 || 0} vencem em 30 dias`,
             cor: (kpis?.asoVencidos || 0) > 0 ? '#E24B4A' : '#1D9E75',
             bg: (kpis?.asoVencidos || 0) > 0 ? '#FCEBEB' : '#EAF3DE',
-            rota: '/s2220',
+            rota: '/aso',
           },
           {
             label:'Pendentes envio',
