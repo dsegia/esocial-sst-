@@ -61,7 +61,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         .eq('id', empresaId)
 
-      console.log(`[stripe] ${event.type} empresa=${empresaId} plano=${plano} status=${sub.status}`)
       break
     }
 
@@ -81,7 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         .eq('id', empresaId)
 
-      console.log(`[stripe] subscription.deleted empresa=${empresaId}`)
       break
     }
 

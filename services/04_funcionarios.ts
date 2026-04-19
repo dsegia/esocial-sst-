@@ -102,7 +102,7 @@ export async function importarFuncionarios(
   empresaId: string,
   linhas: Array<Partial<Funcionario>>
 ) {
-  const resultado = { novos: 0, atualizados: 0, ignorados: 0, erros: string[] = [] }
+  const resultado = { novos: 0, atualizados: 0, ignorados: 0, erros: [] as string[] }
 
   // Busca todos os CPFs existentes da empresa
   const { data: existentes } = await supabase
