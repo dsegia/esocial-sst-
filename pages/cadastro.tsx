@@ -95,6 +95,17 @@ export default function Cadastro() {
         setEmpresaId(empresaId)
       }
 
+      if (typeof window !== 'undefined') {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'Lead')
+        }
+        if (typeof window.gtag === 'function' && process.env.NEXT_PUBLIC_GOOGLE_ADS_ID && process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION) {
+          window.gtag('event', 'conversion', {
+            send_to: `${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID}/${process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION}`,
+          })
+        }
+      }
+
       setEtapa('sucesso')
     } catch (err: any) {
       setErro('Erro inesperado: ' + err.message)

@@ -1,5 +1,7 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+
 export default function Document() {
   return (
     <Html lang="pt-BR">
@@ -18,6 +20,25 @@ export default function Document() {
         <meta name="twitter:title" content="eSocial SST Transmissor" />
         <meta name="twitter:description" content="Transmita eventos SST ao eSocial com facilidade. Importe ASO, LTCAT e PCMSO via IA." />
         <link rel="canonical" href="https://dsegconsultoria.com.br" />
+
+        {GOOGLE_ADS_ID && (
+          <script
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+          />
+        )}
+        {GOOGLE_ADS_ID && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GOOGLE_ADS_ID}');
+              `,
+            }}
+          />
+        )}
       </Head>
       <body>
         <Main />
