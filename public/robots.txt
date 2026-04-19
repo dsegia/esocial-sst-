@@ -22,4 +22,4 @@ Disallow: /historico
 Disallow: /transmissao-manual
 Disallow: /aceitar-convite
 
-Sitemap: https://esocial-sst.vercel.app/sitemap.xml
+Sitemap: https://sst.dsegconsultoria.com.br/sitemap.xml
