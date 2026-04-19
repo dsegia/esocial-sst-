@@ -375,7 +375,7 @@ export default function Home() {
       <nav>
         <div className="nav-inner">
           <a href="#" className="nav-logo">
-            <img src="/logo-branca.png" alt="DSEG Consultoria" style={{ height:'38px', width:'auto' }} />
+            <img src="/logo-branca.png" alt="DSEG Consultoria" style={{ height:'56px', width:'auto' }} />
           </a>
           <div className="nav-links">
             <a href="#eventos">Eventos SST</a>
