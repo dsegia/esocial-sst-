@@ -38,6 +38,8 @@ export default function Layout({ children, pagina }) {
   const [plano, setPlano] = useState<string>('trial')
   const [trialDias, setTrialDias] = useState<number>(14)
 
+  const PAGES_SEM_BLOQUEIO = ['/planos', '/conta', '/login', '/cadastro', '/aceitar-convite', '/']
+
   useEffect(() => {
     setMulti(isMultiEmpresa())
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,10 +55,26 @@ export default function Layout({ children, pagina }) {
               if (emp) {
                 setNomeEmpresa(emp.razao_social || '')
                 setSemCert(!emp.cert_digital_validade)
-                setPlano(emp.plano || 'trial')
-                if (emp.plano === 'trial' && emp.trial_inicio) {
+                const planoAtual = emp.plano || 'trial'
+                setPlano(planoAtual)
+
+                if (planoAtual === 'trial' && emp.trial_inicio) {
                   const dias = Math.max(0, 14 - Math.ceil((Date.now() - new Date(emp.trial_inicio).getTime()) / 86400000))
                   setTrialDias(dias)
+
+                  // Redireciona para planos se trial expirou
+                  const paginaAtual = window.location.pathname
+                  if (dias === 0 && !PAGES_SEM_BLOQUEIO.some(p => paginaAtual.startsWith(p))) {
+                    router.push('/planos?trial_expirado=1')
+                  }
+                }
+
+                // Redireciona se assinatura cancelada
+                if (planoAtual === 'cancelado') {
+                  const paginaAtual = window.location.pathname
+                  if (!PAGES_SEM_BLOQUEIO.some(p => paginaAtual.startsWith(p))) {
+                    router.push('/planos?cancelado=1')
+                  }
                 }
               }
             })

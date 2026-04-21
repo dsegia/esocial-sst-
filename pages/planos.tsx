@@ -135,9 +135,14 @@ export default function Planos() {
           <div style={{ fontSize: 14, color: '#6b7280' }}>
             Sem fidelidade · Cancele quando quiser
           </div>
-          {planoAtual === 'trial' && trialRestante !== null && (
+          {planoAtual === 'trial' && trialRestante !== null && trialRestante > 0 && (
             <div style={{ display:'inline-block', marginTop: 12, background:'#FAEEDA', border:'0.5px solid #FAC775', borderRadius: 8, padding:'8px 16px', fontSize:13, color:'#633806', fontWeight:500 }}>
               ⚠ Seu trial termina em {trialRestante} dia{trialRestante !== 1 ? 's' : ''}
+            </div>
+          )}
+          {(router.query.trial_expirado === '1' || (planoAtual === 'trial' && trialRestante === 0)) && (
+            <div style={{ display:'inline-block', marginTop: 12, background:'#FCEBEB', border:'0.5px solid #F7C1C1', borderRadius: 8, padding:'8px 16px', fontSize:13, color:'#791F1F', fontWeight:600 }}>
+              🔒 Seu trial de 14 dias expirou. Escolha um plano para continuar.
             </div>
           )}
         </div>

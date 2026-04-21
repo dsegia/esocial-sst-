@@ -24,7 +24,9 @@ export default async function handler(req, res) {
   if (!solicitante?.empresa_id) return res.status(403).json({ erro: 'Usuário sem empresa associada' })
 
   const empresaId = solicitante.empresa_id
-  const { email, nome } = req.body
+  const { email, nome, perfil = 'operador' } = req.body
+  const PERFIS_VALIDOS = ['admin', 'operador', 'visualizador']
+  if (!PERFIS_VALIDOS.includes(perfil)) return res.status(400).json({ erro: 'Perfil inválido' })
 
   if (!email || !email.includes('@')) return res.status(400).json({ erro: 'E-mail inválido' })
 
@@ -47,6 +49,7 @@ export default async function handler(req, res) {
       email: email,
       nome: nome || jaAuth.user_metadata?.nome || email.split('@')[0],
       empresa_id: empresaId,
+      perfil,
     }, { onConflict: 'id' })
     if (insErr) return res.status(500).json({ erro: 'Erro ao vincular usuário: ' + insErr.message })
     return res.status(200).json({ sucesso: true, tipo: 'vinculado', mensagem: 'Usuário vinculado à empresa com sucesso' })
@@ -58,7 +61,7 @@ export default async function handler(req, res) {
 
   const { data: invited, error: invErr } = await sb.auth.admin.inviteUserByEmail(email, {
     redirectTo,
-    data: { nome: nome || '', empresa_id: empresaId },
+    data: { nome: nome || '', empresa_id: empresaId, perfil },
   })
   if (invErr) return res.status(500).json({ erro: 'Erro ao enviar convite: ' + invErr.message })
 
@@ -68,6 +71,7 @@ export default async function handler(req, res) {
     email,
     nome: nome || '',
     empresa_id: empresaId,
+    perfil,
   }, { onConflict: 'id' })
 
   return res.status(200).json({ sucesso: true, tipo: 'convidado', mensagem: `Convite enviado para ${email}` })

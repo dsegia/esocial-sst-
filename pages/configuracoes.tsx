@@ -22,9 +22,11 @@ export default function Configuracoes() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [conviteEmail, setConviteEmail] = useState('')
   const [conviteNome, setConviteNome] = useState('')
+  const [convitePerfil, setConvitePerfil] = useState('operador')
   const [enviandoConvite, setEnviandoConvite] = useState(false)
   const [conviteMsg, setConviteMsg] = useState('')
   const [conviteErro, setConviteErro] = useState('')
+  const [alterandoPerfil, setAlterandoPerfil] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState('')
@@ -148,10 +150,25 @@ export default function Configuracoes() {
 
   async function carregarUsuarios(empId: string) {
     setLoadingUsers(true)
-    const { data } = await supabase.from('usuarios').select('id, email, nome, created_at')
+    const { data } = await supabase.from('usuarios').select('id, email, nome, perfil, created_at')
       .eq('empresa_id', empId).order('created_at', { ascending: true })
     setUsuarios(data || [])
     setLoadingUsers(false)
+  }
+
+  async function alterarPerfil(userId: string, novoPerfil: string) {
+    setAlterandoPerfil(userId)
+    const { error } = await supabase.from('usuarios').update({ perfil: novoPerfil }).eq('id', userId)
+    if (error) { setErro('Erro ao alterar perfil: ' + error.message) }
+    else { await carregarUsuarios(empresaId) }
+    setAlterandoPerfil(null)
+  }
+
+  async function removerUsuario(userId: string) {
+    if (!confirm('Remover este usuário da empresa?')) return
+    const { error } = await supabase.from('usuarios').delete().eq('id', userId).eq('empresa_id', empresaId)
+    if (error) { setErro('Erro ao remover: ' + error.message) }
+    else { await carregarUsuarios(empresaId) }
   }
 
   async function enviarConvite(e: React.FormEvent) {
@@ -166,12 +183,12 @@ export default function Configuracoes() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ email: conviteEmail, nome: conviteNome }),
+        body: JSON.stringify({ email: conviteEmail, nome: conviteNome, perfil: convitePerfil }),
       })
       const json = await resp.json()
       if (!resp.ok) throw new Error(json.erro || 'Erro ao enviar convite')
       setConviteMsg(json.mensagem || 'Convite enviado!')
-      setConviteEmail(''); setConviteNome('')
+      setConviteEmail(''); setConviteNome(''); setConvitePerfil('operador')
       carregarUsuarios(empresaId)
     } catch (err: any) {
       setConviteErro(err.message)
@@ -353,13 +370,13 @@ export default function Configuracoes() {
         <div style={s.card}>
           <div style={s.cardTit}>Usuários da Empresa</div>
           <div style={{ fontSize:12, color:'#6b7280', marginBottom:16 }}>
-            Convide colaboradores para acessar o sistema. Cada usuário terá acesso completo à empresa.
+            Convide colaboradores para acessar o sistema com diferentes níveis de acesso.
           </div>
 
           {/* Formulário de convite */}
           <form onSubmit={enviarConvite} style={{ background:'#f9fafb', border:'0.5px solid #e5e7eb', borderRadius:10, padding:'16px', marginBottom:20 }}>
             <div style={{ fontSize:13, fontWeight:600, color:'#111', marginBottom:12 }}>Convidar novo usuário</div>
-            <div style={s.row2}>
+            <div style={s.row3}>
               <div>
                 <label style={s.label}>E-mail *</label>
                 <input style={s.input} type="email" placeholder="colaborador@empresa.com"
@@ -370,6 +387,17 @@ export default function Configuracoes() {
                 <input style={s.input} placeholder="Nome do colaborador"
                   value={conviteNome} onChange={e => setConviteNome(e.target.value)} />
               </div>
+              <div>
+                <label style={s.label}>Perfil de acesso *</label>
+                <select style={s.input} value={convitePerfil} onChange={e => setConvitePerfil(e.target.value)}>
+                  <option value="admin">Admin — acesso total</option>
+                  <option value="operador">Operador — cadastro e transmissão</option>
+                  <option value="visualizador">Visualizador — somente leitura</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom:12, padding:'8px 12px', background:'#E6F1FB', border:'0.5px solid #B5D4F4', borderRadius:8, fontSize:11, color:'#0C447C' }}>
+              <strong>Admin:</strong> pode convidar usuários e alterar configurações · <strong>Operador:</strong> pode cadastrar e transmitir · <strong>Visualizador:</strong> somente consulta
             </div>
             {conviteErro && (
               <div style={{ background:'#FCEBEB', color:'#791F1F', border:'0.5px solid #F7C1C1', borderRadius:8, padding:'8px 12px', fontSize:12, marginBottom:10 }}>
@@ -396,28 +424,52 @@ export default function Configuracoes() {
             <div style={{ fontSize:12, color:'#9ca3af', padding:'12px 0' }}>Nenhum usuário cadastrado além de você.</div>
           ) : (
             <div style={{ border:'0.5px solid #e5e7eb', borderRadius:10, overflow:'hidden' }}>
-              {usuarios.map((u, i) => (
-                <div key={u.id} style={{
-                  display:'flex', alignItems:'center', gap:12, padding:'10px 14px',
-                  borderBottom: i < usuarios.length - 1 ? '0.5px solid #f3f4f6' : 'none',
-                  background:'#fff',
-                }}>
-                  <div style={{ width:32, height:32, borderRadius:'50%', background:'#E6F1FB', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    <span style={{ fontSize:14, color:'#185FA5', fontWeight:600 }}>
-                      {(u.nome || u.email || '?')[0].toUpperCase()}
-                    </span>
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:500, color:'#111' }}>
-                      {u.nome || <span style={{ color:'#9ca3af' }}>Sem nome</span>}
+              {usuarios.map((u, i) => {
+                const PERFIL_COR: Record<string,string[]> = {
+                  admin:        ['#E6F1FB','#0C447C'],
+                  operador:     ['#EAF3DE','#27500A'],
+                  visualizador: ['#f3f4f6','#6b7280'],
+                }
+                const [pbg, ptxt] = PERFIL_COR[u.perfil || 'operador'] || PERFIL_COR.operador
+                return (
+                  <div key={u.id} style={{
+                    display:'flex', alignItems:'center', gap:12, padding:'10px 14px',
+                    borderBottom: i < usuarios.length - 1 ? '0.5px solid #f3f4f6' : 'none',
+                    background:'#fff',
+                  }}>
+                    <div style={{ width:32, height:32, borderRadius:'50%', background:'#E6F1FB', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <span style={{ fontSize:14, color:'#185FA5', fontWeight:600 }}>
+                        {(u.nome || u.email || '?')[0].toUpperCase()}
+                      </span>
                     </div>
-                    <div style={{ fontSize:11, color:'#6b7280' }}>{u.email}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:500, color:'#111' }}>
+                        {u.nome || <span style={{ color:'#9ca3af' }}>Sem nome</span>}
+                      </div>
+                      <div style={{ fontSize:11, color:'#6b7280' }}>{u.email}</div>
+                    </div>
+                    <span style={{ padding:'2px 9px', borderRadius:99, fontSize:11, fontWeight:600, background:pbg, color:ptxt, flexShrink:0 }}>
+                      {u.perfil || 'operador'}
+                    </span>
+                    <select
+                      disabled={alterandoPerfil === u.id}
+                      value={u.perfil || 'operador'}
+                      onChange={e => alterarPerfil(u.id, e.target.value)}
+                      style={{ fontSize:11, padding:'3px 6px', border:'0.5px solid #d1d5db', borderRadius:6, background:'#fff', cursor:'pointer', color:'#374151' }}>
+                      <option value="admin">Admin</option>
+                      <option value="operador">Operador</option>
+                      <option value="visualizador">Visualizador</option>
+                    </select>
+                    <button onClick={() => removerUsuario(u.id)}
+                      style={{ background:'none', border:'0.5px solid #F09595', borderRadius:6, padding:'3px 8px', fontSize:11, color:'#E24B4A', cursor:'pointer', flexShrink:0 }}>
+                      Remover
+                    </button>
+                    <div style={{ fontSize:11, color:'#9ca3af', flexShrink:0 }}>
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—'}
+                    </div>
                   </div>
-                  <div style={{ fontSize:11, color:'#9ca3af' }}>
-                    {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—'}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
