@@ -12,11 +12,22 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const CREDITOS_POR_PLANO: Record<string, number> = {
+  micro:        30,
+  starter:      100,
+  pro:          400,
+  professional: 100,
+  business:     9999,
+  enterprise:   9999,
+}
+
 const MAX_FUNCIONARIOS: Record<string, number> = {
-  starter:    50,
-  pro:        200,
-  business:   500,
-  enterprise: 999999,
+  micro:        50,
+  starter:      200,
+  pro:          1000,
+  professional: 200,
+  business:     1000,
+  enterprise:   999999,
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -38,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   switch (event.type) {
 
-    // Assinatura criada / ativada
+    // Assinatura criada / atualizada
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription
@@ -51,6 +62,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? new Date(sub.current_period_end * 1000).toISOString()
         : null
 
+      const creditosIncluidos = CREDITOS_POR_PLANO[plano] ?? 0
+
+      // Extrai o subscription item metered (excedente), se presente
+      const meteredItem = (sub.items?.data ?? []).find(
+        (item: any) => item.price?.recurring?.usage_type === 'metered'
+      )
+
       await supabaseAdmin
         .from('empresas')
         .update({
@@ -58,6 +76,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           plano_expira_em: expira,
           stripe_subscription_id: sub.id,
           max_funcionarios: ativo ? (MAX_FUNCIONARIOS[plano] ?? 50) : 0,
+          creditos_incluidos: ativo ? creditosIncluidos : 0,
+          creditos_restantes: ativo ? creditosIncluidos : 0,
+          stripe_metered_item_id: meteredItem?.id ?? null,
         })
         .eq('id', empresaId)
 
@@ -76,14 +97,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           plano: 'cancelado',
           plano_expira_em: null,
           stripe_subscription_id: null,
+          stripe_metered_item_id: null,
           max_funcionarios: 0,
+          creditos_restantes: 0,
+          creditos_incluidos: 0,
         })
         .eq('id', empresaId)
 
       break
     }
 
-    // Pagamento falhou — notifica por e-mail (Resend)
+    // Fatura paga — renova créditos do ciclo mensal
+    case 'invoice.paid': {
+      const invoice = event.data.object as Stripe.Invoice
+      const subscriptionId = invoice.subscription as string
+      if (!subscriptionId) break
+
+      const { data: empresa } = await supabaseAdmin
+        .from('empresas')
+        .select('id, creditos_incluidos')
+        .eq('stripe_subscription_id', subscriptionId)
+        .single()
+
+      if (empresa && empresa.creditos_incluidos > 0) {
+        await supabaseAdmin
+          .from('empresas')
+          .update({ creditos_restantes: empresa.creditos_incluidos })
+          .eq('id', empresa.id)
+      }
+      break
+    }
+
+    // Pagamento falhou — notifica por e-mail
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
       const customerId = invoice.customer as string
@@ -95,7 +140,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .single()
 
       if (empresa) {
-        // Busca o e-mail do admin
         const { data: usuario } = await supabaseAdmin
           .from('usuarios')
           .select('id')
@@ -110,7 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
@@ -133,7 +177,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     default:
-      // Evento não tratado — ignora silenciosamente
       break
   }
 

@@ -1,6 +1,8 @@
 // pages/api/transmitir-esocial.js
 // Transmite eventos assinados ao webservice SOAP do eSocial
 
+import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, getClientIP } from '../../lib/rate-limit'
 import { requireAuth } from '../../lib/auth-middleware'
 
@@ -8,6 +10,12 @@ const ENDPOINTS = {
   producao_restrita: 'https://webservices.producaorestrita.esocial.gov.br/servicos/empregador/envioLoteEventos/enviarLoteEventos/v1_1_0/index.php',
   producao:          'https://webservices.esocial.gov.br/servicos/empregador/envioLoteEventos/enviarLoteEventos/v1_1_0/index.php',
 }
+
+const sbAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
@@ -19,6 +27,49 @@ export default async function handler(req, res) {
   const { limited, retryAfter } = checkRateLimit(ip, { windowMs: 60_000, max: 10 })
   if (limited) return res.status(429).json({ erro: 'Muitas requisições. Tente novamente em breve.', retryAfter })
 
+  // Resolve empresa_id do usuário autenticado
+  const { data: usuarioDb } = await sbAdmin
+    .from('usuarios').select('empresa_id').eq('id', user.id).single()
+  const empresaId = usuarioDb?.empresa_id || user.user_metadata?.empresa_id
+
+  if (!empresaId) return res.status(403).json({ erro: 'Empresa não encontrada para este usuário' })
+
+  // Verifica e consome crédito de envio
+  const { data: empresa } = await sbAdmin
+    .from('empresas')
+    .select('id, plano, creditos_restantes, stripe_metered_item_id')
+    .eq('id', empresaId).single()
+
+  if (!empresa) return res.status(403).json({ erro: 'Empresa não encontrada' })
+
+  if (empresa.plano === 'cancelado') {
+    return res.status(403).json({ erro: 'Assinatura cancelada. Acesse /planos para reativar.', sem_creditos: true })
+  }
+
+  if (empresa.creditos_restantes > 0) {
+    // Consome 1 crédito incluído
+    await sbAdmin.from('empresas')
+      .update({ creditos_restantes: empresa.creditos_restantes - 1 })
+      .eq('id', empresaId)
+  } else if (empresa.stripe_metered_item_id && process.env.STRIPE_SECRET_KEY) {
+    // Créditos esgotados — registra uso metered no Stripe (cobrado no fechamento do ciclo)
+    try {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' })
+      await stripe.subscriptionItems.createUsageRecord(empresa.stripe_metered_item_id, {
+        quantity: 1,
+        action: 'increment',
+      })
+    } catch (err) {
+      console.error('[transmitir] erro ao registrar uso metered:', err?.message)
+      return res.status(500).json({ erro: 'Erro ao registrar envio excedente. Tente novamente.' })
+    }
+  } else if (empresa.plano !== 'trial' && empresa.plano !== 'enterprise') {
+    return res.status(402).json({
+      erro: 'Créditos de envio esgotados. Acesse Planos para adquirir um plano com mais envios.',
+      sem_creditos: true,
+    })
+  }
+
   const { xml_assinado, cnpj_empregador, ambiente = 'producao_restrita', transmissao_id } = req.body
 
   if (!xml_assinado || !cnpj_empregador) {
@@ -29,7 +80,6 @@ export default async function handler(req, res) {
   if (!endpoint) return res.status(400).json({ erro: 'Ambiente inválido' })
 
   try {
-    // Montar envelope SOAP conforme especificação eSocial
     const nrLote = Date.now().toString()
     const dataHoraTransmissao = new Date().toISOString()
 
@@ -63,7 +113,6 @@ export default async function handler(req, res) {
   </soapenv:Body>
 </soapenv:Envelope>`
 
-    // Enviar ao webservice eSocial
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -71,16 +120,14 @@ export default async function handler(req, res) {
         'SOAPAction': '"enviarLoteEventos"',
       },
       body: soapEnvelope,
-      // Timeout de 30 segundos
       signal: AbortSignal.timeout(30000),
     })
 
     const resBody = await response.text()
 
-    // Parsear resposta SOAP
-    const recibo = resBody.match(/<nrRec>([^<]+)<\/nrRec>/)?.[1]
-    const cdResp = resBody.match(/<cdResp>([^<]+)<\/cdResp>/)?.[1]
-    const descResp = resBody.match(/<descResp>([^<]+)<\/descResp>/)?.[1]
+    const recibo    = resBody.match(/<nrRec>([^<]+)<\/nrRec>/)?.[1]
+    const cdResp    = resBody.match(/<cdResp>([^<]+)<\/cdResp>/)?.[1]
+    const descResp  = resBody.match(/<descResp>([^<]+)<\/descResp>/)?.[1]
     const ocorrencias = [...resBody.matchAll(/<dsMsg>([^<]+)<\/dsMsg>/g)].map(m => m[1])
 
     if (recibo) {
@@ -94,7 +141,6 @@ export default async function handler(req, res) {
       })
     }
 
-    // Verificar erros na resposta
     if (cdResp && parseInt(cdResp) > 0) {
       return res.status(422).json({
         sucesso: false,
@@ -105,7 +151,6 @@ export default async function handler(req, res) {
       })
     }
 
-    // Resposta inesperada
     return res.status(500).json({
       sucesso: false,
       erro: 'Resposta inesperada do Gov.br',
