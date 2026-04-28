@@ -81,7 +81,7 @@ function codigoAgente(nome) {
 
 // ── Logger de IA (fire-and-forget, nunca quebra o fluxo) ─────────────
 function logIA(servico, modelo, status, duracao_ms, tipo, erro) {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   fetch(`${base}/api/internal/log-ia`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET || '' },
@@ -177,6 +177,40 @@ REGRAS GERAIS:
 - Agentes: se o documento indica ausência com qualquer termo ("Inexiste", "Ausência", "Não há", "Sem exposição", "Não significativo", "ISENTO", "Abaixo do LT") → agentes = []
 - EPI "--" → epi = []
 - Retorne SOMENTE o JSON, sem texto antes ou depois`
+
+// Enriquece resultado com códigos das tabelas (escopo de módulo para uso em lerComClaude e handler)
+function enriquecer(dados, tipo) {
+  if (!dados) return dados
+  if (tipo !== 'ltcat') {
+    if (dados.exames?.length) {
+      dados.exames = dados.exames.map(ex => ({
+        ...ex,
+        codigo_t27: codigoExame(ex.nome),
+      }))
+    }
+    if (dados.riscos?.length) {
+      dados.riscos_codificados = dados.riscos.map(r => ({
+        nome: r,
+        codigo_t24: codigoAgente(r),
+        tipo: codigoAgente(r).startsWith('01') ? 'fis'
+            : codigoAgente(r).startsWith('02') ? 'qui'
+            : codigoAgente(r).startsWith('03') ? 'bio'
+            : codigoAgente(r).startsWith('09') ? 'aus' : 'out',
+      }))
+    }
+  } else {
+    if (dados.ghes?.length) {
+      dados.ghes = dados.ghes.map(ghe => ({
+        ...ghe,
+        agentes: (ghe.agentes||[]).map(ag => ({
+          ...ag,
+          codigo_t24: codigoAgente(ag.nome),
+        }))
+      }))
+    }
+  }
+  return dados
+}
 
 // ── Leitor Claude com PDF nativo (primário para LTCAT/PCMSO) ─
 async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) {
@@ -375,43 +409,6 @@ REGRAS CRÍTICAS:
       ()=>JSON.parse(extrairJSON(texto)),
     ]) { try { const r=fn(); if(r) return r } catch {} }
     return null
-  }
-
-  // Enriquece resultado com códigos das tabelas
-  function enriquecer(dados, tipo) {
-    if (!dados) return dados
-    if (tipo !== 'ltcat') {
-      // Mapeia exames → Tabela 27
-      if (dados.exames?.length) {
-        dados.exames = dados.exames.map(ex => ({
-          ...ex,
-          codigo_t27: codigoExame(ex.nome),
-        }))
-      }
-      // Mapeia riscos → Tabela 24
-      if (dados.riscos?.length) {
-        dados.riscos_codificados = dados.riscos.map(r => ({
-          nome: r,
-          codigo_t24: codigoAgente(r),
-          tipo: codigoAgente(r).startsWith('01') ? 'fis'
-              : codigoAgente(r).startsWith('02') ? 'qui'
-              : codigoAgente(r).startsWith('03') ? 'bio'
-              : codigoAgente(r).startsWith('09') ? 'aus' : 'out',
-        }))
-      }
-    } else {
-      // LTCAT: mapeia agentes dos GHEs → Tabela 24
-      if (dados.ghes?.length) {
-        dados.ghes = dados.ghes.map(ghe => ({
-          ...ghe,
-          agentes: (ghe.agentes||[]).map(ag => ({
-            ...ag,
-            codigo_t24: codigoAgente(ag.nome),
-          }))
-        }))
-      }
-    }
-    return dados
   }
 
   // ── GEMINI ─────────────────────────────────────────

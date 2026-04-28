@@ -45,9 +45,13 @@ export default function Conta() {
     setMsg('')
     const empresaId = getEmpresaId()
 
+    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/stripe/checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
       body: JSON.stringify({ plano, empresa_id: empresaId, user_email: email }),
     })
     const json = await res.json()
@@ -55,7 +59,7 @@ export default function Conta() {
     if (json.url) {
       window.location.href = json.url
     } else {
-      setMsg('Erro ao criar checkout: ' + (json.error || 'tente novamente'))
+      setMsg('Erro ao criar checkout: ' + (json.erro || 'tente novamente'))
       setUpgradando('')
     }
   }
