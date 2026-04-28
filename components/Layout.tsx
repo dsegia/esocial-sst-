@@ -24,7 +24,6 @@ const MENU = [
   { href:'/fila-transmissao', label:'Fila de Transmissão',    icon:'M4 6h16M4 10h16M4 14h8m-8 4h4' },
   { sep:true, label:'GESTÃO' },
   { href:'/relatorios',       label:'Relatórios',             icon:'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-  { href:'/analytics',        label:'Analytics',              icon:'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
   { href:'/relatorio-conformidade', label:'Conformidade',     icon:'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
   { href:'/alertas',          label:'Alertas',                icon:'M12 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zM12 6v6l4 2' },
   { href:'/planos',          label:'Planos',                  icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
