@@ -270,7 +270,7 @@ export default function Funcionarios() {
   }
 
   const dadosIncompletos = (f) =>
-    !f.data_adm || !f.data_nasc ||
+    !f.data_adm || !f.data_nasc || !f.cod_cbo ||
     !f.matricula_esocial || f.matricula_esocial.startsWith('PEND-') || f.matricula_esocial.startsWith('AUTO-')
 
   if (carregando) return <div style={s.loading}>Carregando...</div>
@@ -349,12 +349,18 @@ export default function Funcionarios() {
                       setCboAberto(sugs.length > 0)
                     }}
                     onFocus={() => { if (cboSugestoes.length > 0) setCboAberto(true) }}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setCboAberto(false)
+                        if (form.funcao.trim() && !form.cod_cbo) {
+                          const sugs = buscarCBO(form.funcao)
+                          if (sugs.length === 1) {
+                            setForm(prev => ({ ...prev, cod_cbo: sugs[0].codigo, funcao: sugs[0].nome }))
+                          }
+                        }
+                      }, 150)
+                    }}
                   />
-                  {form.cod_cbo && (
-                    <span style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', fontSize:10, fontWeight:600, color:'#185FA5', background:'#E6F1FB', padding:'1px 6px', borderRadius:99, pointerEvents:'none' }}>
-                      {form.cod_cbo}
-                    </span>
-                  )}
                   {cboAberto && cboSugestoes.length > 0 && (
                     <div style={{ position:'absolute', top:'calc(100% + 2px)', left:0, right:0, background:'#fff', border:'1px solid #d1d5db', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.1)', zIndex:200, overflow:'hidden' }}>
                       {cboSugestoes.map(c => (
@@ -365,12 +371,23 @@ export default function Funcionarios() {
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         >
                           <span style={{ color:'#111' }}>{c.nome}</span>
-                          <span style={{ fontSize:10, color:'#9ca3af', fontFamily:'monospace', flexShrink:0, marginLeft:8 }}>{c.codigo}</span>
+                          <span style={{ fontSize:11, color:'#185FA5', fontFamily:'monospace', fontWeight:600, flexShrink:0, marginLeft:8 }}>{c.codigo}</span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
+                {form.funcao.trim() && (
+                  form.cod_cbo
+                    ? <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:5, fontSize:11 }}>
+                        <span style={{ background:'#E6F1FB', color:'#185FA5', fontWeight:700, fontFamily:'monospace', padding:'2px 8px', borderRadius:99 }}>{form.cod_cbo}</span>
+                        <span style={{ color:'#6b7280' }}>CBO vinculado</span>
+                      </div>
+                    : <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:5, fontSize:11, color:'#92400e' }}>
+                        <span>⚠</span>
+                        <span>CBO não vinculado — selecione da lista para vincular o código</span>
+                      </div>
+                )}
               </div>
               <div style={s.field}>
                 <label style={s.label}>Setor / GHE</label>
@@ -428,7 +445,13 @@ export default function Funcionarios() {
                   </td>
                   <td style={{ ...s.td, fontFamily:'monospace', fontSize:12 }}>{f.cpf}</td>
                   <td style={s.td}>{f.data_adm ? new Date(f.data_adm+'T12:00:00').toLocaleDateString('pt-BR') : <span style={{ color:'#d1d5db' }}>—</span>}</td>
-                  <td style={s.td}>{f.funcao || <span style={{ color:'#d1d5db' }}>—</span>}</td>
+                  <td style={s.td}>
+                    <div>{f.funcao || <span style={{ color:'#d1d5db' }}>—</span>}</div>
+                    {f.cod_cbo
+                      ? <span style={{ fontSize:10, fontWeight:700, fontFamily:'monospace', color:'#185FA5', background:'#E6F1FB', padding:'1px 6px', borderRadius:99 }}>{f.cod_cbo}</span>
+                      : f.funcao ? <span style={{ fontSize:10, color:'#92400e' }}>⚠ sem CBO</span> : null
+                    }
+                  </td>
                   <td style={s.td}>{f.setor || <span style={{ color:'#d1d5db' }}>—</span>}</td>
                   <td style={s.td}>
                     <span style={{ padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:500,
