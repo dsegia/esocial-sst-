@@ -83,6 +83,7 @@ export default function S2240() {
   const [novoExameCodigo, setNovoExameCodigo] = useState(EXAMES_ESOCIAL[0].codigo)
   const [novoExameResultado, setNovoExameResultado] = useState<'Normal'|'Alterado'|'Pendente'>('Normal')
   const [asos, setAsos] = useState<any[]>([])
+  const [alertaEpiEpc, setAlertaEpiEpc] = useState<{funcId: string, ghe: any} | null>(null)
 
   useEffect(() => { init() }, [])
 
@@ -233,7 +234,8 @@ export default function S2240() {
     init()
   }
 
-  async function criarTransmissao(funcId) {
+  async function criarTransmissao(funcId: string, ignorarAlertaEpi = false) {
+    if (!ignorarEpiEpc(funcId, ignorarAlertaEpi)) return
     const { error } = await supabase.from('transmissoes').insert({
       empresa_id: empresaId, funcionario_id: funcId,
       evento: 'S-2240', referencia_id: ltcatAtivo.id, referencia_tipo: 'ltcat',
@@ -242,6 +244,17 @@ export default function S2240() {
     if (error) { setErro('Erro: ' + error.message); return }
     setSucesso('Transmissão S-2240 criada.')
     init()
+  }
+
+  function ignorarEpiEpc(funcId: string, forcar: boolean): boolean {
+    if (forcar) return true
+    const func = funcionarios.find((f: any) => f.id === funcId)
+    const ghe = func ? gheDoFuncionario(func) : null
+    if (ghe && (!ghe.epi?.length && !ghe.epc?.length)) {
+      setAlertaEpiEpc({ funcId, ghe })
+      return false
+    }
+    return true
   }
 
   async function salvarEdicaoFunc() {
@@ -277,14 +290,20 @@ export default function S2240() {
   }
 
   async function criarParaTodos() {
-    // Apenas funcionários cujo ASO exige S-2240 (admissional, mudança, retorno, demissional)
     const aptos = funcsFiltradas.filter(f => {
       if (statusFuncionario(f).label !== 'Não transmitido') return false
       const aso = ultimoAsoFunc(f.id)
       return !aso || TIPOS_EXIGEM_S2240.has(aso.tipo_aso)
     })
-    for (const f of aptos) await criarTransmissao(f.id)
-    setSucesso(`${aptos.length} transmissão(ões) criada(s). Acesse "Ir para transmissão" para enviar.`)
+    const semEpiEpc = aptos.filter(f => {
+      const ghe = gheDoFuncionario(f)
+      return ghe && !ghe.epi?.length && !ghe.epc?.length && ghe.agentes?.length > 0
+    })
+    for (const f of aptos) await criarTransmissao(f.id, true)
+    const aviso = semEpiEpc.length > 0
+      ? ` ⚠ ${semEpiEpc.length} sem EPI/EPC — preencha no LTCAT antes de transmitir.`
+      : ''
+    setSucesso(`${aptos.length} transmissão(ões) criada(s).${aviso} Acesse "Ir para transmissão" para enviar.`)
   }
 
   const funcsFiltradas = funcionarios.filter(f => {
@@ -420,6 +439,49 @@ export default function S2240() {
             <div style={{ display:'flex', gap:8 }}>
               <button style={s.btnPrimary} onClick={() => vincularGHE(mapeandoFunc)} disabled={gheSelecionado===''}>Vincular GHE</button>
               <button style={s.btnOutline} onClick={() => { setMapeandoFunc(null); setGheSelecionado('') }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal alerta EPI/EPC */}
+      {alertaEpiEpc && (
+        <div style={s.overlay} onClick={() => setAlertaEpiEpc(null)}>
+          <div style={{ ...s.modal, maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#92400e', marginBottom:10 }}>
+              ⚠ EPI e EPC não preenchidos
+            </div>
+            <div style={{ fontSize:13, color:'#374151', lineHeight:1.7, marginBottom:14 }}>
+              O GHE <strong>{alertaEpiEpc.ghe.nome || 'selecionado'}</strong> não possui dados de
+              EPI (Equipamento de Proteção Individual) nem EPC (Equipamento de Proteção Coletiva).
+            </div>
+            <div style={{ background:'#FAEEDA', border:'0.5px solid #F0D58E', borderRadius:10, padding:'12px 14px', fontSize:12, color:'#633806', marginBottom:16, lineHeight:1.7 }}>
+              <strong>O eSocial exige essas informações para o S-2240.</strong> Sem EPI/EPC preenchidos
+              no LTCAT, o campo <code>epcEpi</code> do XML será enviado com <code>utilizEpc=N</code> e{' '}
+              <code>utilizEpi=N</code>, o que pode ser rejeitado se o GHE possuir agentes nocivos.
+              <br /><br />
+              <strong>Recomendado:</strong> acesse o LTCAT, edite o GHE e informe os EPIs e EPCs utilizados
+              antes de transmitir.
+            </div>
+            {alertaEpiEpc.ghe.agentes?.length > 0 && (
+              <div style={{ fontSize:12, color:'#6b7280', marginBottom:14 }}>
+                Agentes de risco no GHE: {alertaEpiEpc.ghe.agentes.map((a: any) => a.nome).join(', ')}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button style={s.btnPrimary} onClick={() => router.push('/ltcat')}>
+                Preencher EPI/EPC no LTCAT
+              </button>
+              <button
+                style={{ ...s.btnOutline, color:'#EF9F27', borderColor:'#F0D58E' }}
+                onClick={async () => {
+                  const id = alertaEpiEpc.funcId
+                  setAlertaEpiEpc(null)
+                  await criarTransmissao(id, true)
+                }}>
+                Criar S-2240 mesmo assim
+              </button>
+              <button style={s.btnOutline} onClick={() => setAlertaEpiEpc(null)}>Cancelar</button>
             </div>
           </div>
         </div>

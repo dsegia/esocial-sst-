@@ -277,6 +277,13 @@ export default function Importar() {
       )
       const { tipo_detectado, dados } = resultado
 
+      if (!tipo_detectado || !TIPO_INFO[tipo_detectado]) {
+        throw new Error(
+          `Tipo de documento não reconhecido pela IA${tipo_detectado ? ` ("${tipo_detectado}")` : ''}. ` +
+          'Certifique-se que o PDF é um ASO, LTCAT ou PCMSO válido e tente novamente.'
+        )
+      }
+
       if (tipo_detectado === 'aso') {
         atualizarItem(item.id, { progresso: 'Verificando funcionário...' })
         const func = await buscarFuncionario(dados.funcionario?.cpf, empId)

@@ -281,8 +281,11 @@ async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) 
     const resultado = parseRobusto(texto)
     if (resultado) {
       const modo = pdf_base64 ? 'pdf-nativo' : paginas?.length > 0 ? 'imagem' : 'texto'
-      if (tipo === 'auto' && resultado.tipo) {
-        const tipoDetectado = resultado.tipo
+      if (tipo === 'auto') {
+        // Garante que tipo existe — se Claude esqueceu, inferir pela estrutura
+        const tipoDetectado = resultado.tipo ||
+          (resultado.ghes ? 'ltcat' : resultado.programas ? 'pcmso' : resultado.aso ? 'aso' : null)
+        if (!tipoDetectado) throw new Error('Tipo de documento não identificado pelo Claude')
         const { tipo: _, ...dadosSemTipo } = resultado
         return { tipo_detectado: tipoDetectado, dados: enriquecer(dadosSemTipo, tipoDetectado), modo, modelo: 'claude-sonnet' }
       }
@@ -481,8 +484,10 @@ REGRAS CRÍTICAS:
         const resultado = parseRobusto(texto)
         if (resultado) {
           logIA('gemini', modelo, 'ok', Date.now() - _t0gem, tipo)
-          if (tipo === 'auto' && resultado.tipo) {
-            const tipoDetectado = resultado.tipo
+          if (tipo === 'auto') {
+            const tipoDetectado = resultado.tipo ||
+              (resultado.ghes ? 'ltcat' : resultado.programas ? 'pcmso' : resultado.aso ? 'aso' : null)
+            if (!tipoDetectado) continue
             const { tipo: _, ...dadosSemTipo } = resultado
             return res.status(200).json({ sucesso:true, tipo_detectado: tipoDetectado, dados: enriquecer(dadosSemTipo, tipoDetectado), modo: usandoTexto?'texto':'imagem', modelo })
           }
@@ -521,6 +526,14 @@ REGRAS CRÍTICAS:
       const resultado = parseRobusto(data.content?.[0]?.text || '')
       if (resultado) {
         logIA('claude', 'claude-haiku-fallback', 'ok', Date.now() - _t0haiku, tipo)
+        if (tipo === 'auto') {
+          const tipoDetectado = resultado.tipo ||
+            (resultado.ghes ? 'ltcat' : resultado.programas ? 'pcmso' : resultado.aso ? 'aso' : null)
+          if (tipoDetectado) {
+            const { tipo: _, ...dadosSemTipo } = resultado
+            return res.status(200).json({ sucesso:true, tipo_detectado: tipoDetectado, dados: enriquecer(dadosSemTipo, tipoDetectado), modo: usandoTexto?'texto':'imagem', modelo:'claude-fallback' })
+          }
+        }
         return res.status(200).json({ sucesso:true, dados: enriquecer(resultado, tipo), modo: usandoTexto?'texto':'imagem', modelo:'claude-fallback' })
       }
     } catch (err) {
