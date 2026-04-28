@@ -179,8 +179,8 @@ export default function Funcionarios() {
   }
 
   async function desativar(id, nome) {
-    if (!confirm(`Remover ${nome} do sistema?`)) return
-    await supabase.from('funcionarios').update({ ativo: false }).eq('id', id)
+    if (!confirm(`Excluir ${nome} permanentemente? Todos os ASOs e transmissões vinculados também serão removidos.`)) return
+    await supabase.from('funcionarios').delete().eq('id', id)
     carregar(empresaId, busca)
   }
 

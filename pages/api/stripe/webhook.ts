@@ -22,11 +22,11 @@ const CREDITOS_POR_PLANO: Record<string, number> = {
 }
 
 const MAX_FUNCIONARIOS: Record<string, number> = {
-  micro:        50,
-  starter:      200,
-  pro:          1000,
-  professional: 200,
-  business:     1000,
+  micro:        999999,
+  starter:      999999,
+  pro:          999999,
+  professional: 999999,
+  business:     999999,
   enterprise:   999999,
 }
 
@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           plano_expira_em: null,
           stripe_subscription_id: null,
           stripe_metered_item_id: null,
-          max_funcionarios: 0,
+          max_funcionarios: 999999,
           creditos_restantes: 0,
           creditos_incluidos: 0,
         })

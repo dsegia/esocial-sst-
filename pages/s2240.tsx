@@ -274,9 +274,9 @@ export default function S2240() {
   }
 
   async function excluirFuncionario(funcId) {
-    const { error } = await supabase.from('funcionarios').update({ ativo: false }).eq('id', funcId)
+    const { error } = await supabase.from('funcionarios').delete().eq('id', funcId)
     if (error) { setErro('Erro: ' + error.message); return }
-    setSucesso('Funcionário removido da lista.')
+    setSucesso('Funcionário excluído permanentemente.')
     setConfirmExcluirFunc(null)
     init()
   }
@@ -640,9 +640,9 @@ export default function S2240() {
           <div style={s.modal} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize:14, fontWeight:600, color:'#111', marginBottom:8 }}>🗑 Remover funcionário</div>
             <div style={{ fontSize:13, color:'#374151', marginBottom:14, lineHeight:1.6 }}>
-              Remover <strong>{confirmExcluirFunc.nome}</strong> da lista?
-              <div style={{ marginTop:8, background:'#FAEEDA', padding:'8px 12px', borderRadius:8, color:'#633806', fontSize:12 }}>
-                O funcionário será desativado mas seus dados e transmissões serão mantidos.
+              Excluir <strong>{confirmExcluirFunc.nome}</strong> permanentemente?
+              <div style={{ marginTop:8, background:'#FCEBEB', padding:'8px 12px', borderRadius:8, color:'#791F1F', fontSize:12 }}>
+                ⚠ Esta ação é irreversível. O funcionário e todos os seus ASOs e transmissões vinculadas serão removidos do banco de dados.
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>

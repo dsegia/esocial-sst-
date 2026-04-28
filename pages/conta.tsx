@@ -114,7 +114,7 @@ export default function Conta() {
           )}
 
           <div style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>
-            Funcionários: <strong>{status?.qtd_funcionarios}/{status?.max_funcionarios === 999999 ? '∞' : status?.max_funcionarios}</strong>
+            Funcionários cadastrados: <strong>{status?.qtd_funcionarios}</strong>
           </div>
         </div>
 
