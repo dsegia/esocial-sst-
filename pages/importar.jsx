@@ -142,14 +142,18 @@ async function processarArquivo(file, onProgresso, token) {
   return json
 }
 
-// ── Buscar funcionário por CPF ────────────────────────────
+// ── Buscar funcionário por CPF (reativa se estiver inativo) ─
 async function buscarFuncionario(cpf, empresaId) {
   const cpfBruto = (cpf || '').replace(/\D/g, '')
   if (cpfBruto.length !== 11) return null
   const cpfFmt = cpfBruto.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
   const { data } = await supabase.from('funcionarios')
     .select('id, nome, ativo').eq('empresa_id', empresaId).eq('cpf', cpfFmt).single()
-  return data || null
+  if (!data) return null
+  if (!data.ativo) {
+    await supabase.from('funcionarios').update({ ativo: true }).eq('id', data.id)
+  }
+  return data
 }
 
 // ── Salvar ASO com funcionário já conhecido ───────────────

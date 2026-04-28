@@ -113,8 +113,7 @@ export default function Aso() {
       .not('funcionario_id', 'is', null)
       .order('data_exame', { ascending: false })
 
-    const validos = (data || []).filter(a => a.funcionarios?.ativo !== false)
-    setAsos(validos)
+    setAsos(data || [])
     setCarregando(false)
   }
 
