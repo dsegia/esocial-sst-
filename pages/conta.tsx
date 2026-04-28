@@ -71,7 +71,7 @@ export default function Conta() {
   )
 
   const planoAtual = status?.plano || 'trial'
-  const planosVisiveis = ['starter', 'professional', 'business'] as TipoPlano[]
+  const planosVisiveis = ['micro', 'starter', 'pro'] as TipoPlano[]
 
   return (
     <Layout pagina="conta">
@@ -133,7 +133,7 @@ export default function Conta() {
         {planosVisiveis.map(p => {
           const info = PLANOS[p]
           const isCurrent = p === planoAtual
-          const isPopular = p === 'professional'
+          const isPopular = p === 'starter'
 
           return (
             <div key={p} style={{
@@ -158,17 +158,22 @@ export default function Conta() {
               <div style={{ fontSize: 22, fontWeight: 800, color: info.cor, marginBottom: 4 }}>
                 R$ {info.preco}<span style={{ fontSize: 12, fontWeight: 400, color: '#9ca3af' }}>/mês</span>
               </div>
-              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 14 }}>
-                {info.max === 999999 ? 'Funcionários ilimitados' : `Até ${info.max} funcionários`}
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                {info.envios ? `${info.envios} envios/mês incluídos` : info.max === 999999 ? 'Funcionários ilimitados' : `Até ${info.max} funcionários`}
               </div>
+              {info.excedente && (
+                <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 10 }}>{info.excedente}</div>
+              )}
 
               {[
-                'Leitura de PDF com IA',
+                'Importação por IA (PDF)',
                 'Transmissão eSocial',
                 'Alertas de vencimento',
-                p === 'professional' ? 'Multi-empresa (até 5 CNPJs)' : null,
-                p === 'business' ? 'Até 10 CNPJs' : null,
-                p === 'business' ? 'Suporte prioritário' : null,
+                p === 'starter' ? 'Multi-empresa (até 5 CNPJs)' : null,
+                p === 'starter' ? 'Convite de usuários' : null,
+                p === 'pro' ? 'Até 10 CNPJs' : null,
+                p === 'pro' ? 'Suporte prioritário' : null,
+                p === 'pro' ? 'Onboarding dedicado' : null,
               ].filter(Boolean).map(feat => (
                 <div key={feat} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#374151', marginBottom: 4 }}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={info.cor} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>

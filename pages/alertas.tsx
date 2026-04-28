@@ -35,11 +35,11 @@ export default function Alertas() {
   async function init() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return }
-    const { data: user } = await supabase.from('usuarios').select('empresa_id, email').eq('id', session.user.id).single()
+    const { data: user } = await supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
     if (!user) { router.push('/login'); return }
     const empId = getEmpresaId() || user.empresa_id
     setEmpresaId(empId)
-    if (user.email) setEmailDestino(user.email)
+    if (session.user.email) setEmailDestino(session.user.email)
     const { data } = await supabase.rpc('get_alertas_vencimento', { p_empresa_id: empId })
     setAlertas(data as Alerta[] || [])
     setCarregando(false)
