@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
-import { buscarCBO, type CBO } from '../lib/cbo'
+import { buscarCBO, melhorCBO, type CBO } from '../lib/cbo'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
@@ -130,14 +130,17 @@ export default function Funcionarios() {
     if (!form.cpf.trim()) { setErro('CPF é obrigatório.'); return }
     if (!validarCPF(form.cpf)) { setErro('CPF inválido. Verifique os dígitos.'); return }
 
+    const funcaoTrim = form.funcao.trim()
+    const cboCodigo = form.cod_cbo.trim() || (funcaoTrim ? melhorCBO(funcaoTrim)?.codigo || null : null)
+
     const dados = {
       nome: form.nome.trim(),
       cpf: form.cpf.trim(),
       data_nasc: form.data_nasc || null,
       data_adm: form.data_adm || null,
       matricula_esocial: form.matricula_esocial.trim() || ('PEND-' + Date.now()),
-      funcao: form.funcao.trim() || null,
-      cod_cbo: form.cod_cbo.trim() || null,
+      funcao: funcaoTrim || null,
+      cod_cbo: cboCodigo,
       setor: form.setor.trim() || null,
       vinculo: form.vinculo,
       turno: form.turno,

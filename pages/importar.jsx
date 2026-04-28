@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
+import { melhorCBO } from '../lib/cbo'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -142,16 +143,24 @@ async function processarArquivo(file, onProgresso, token) {
   return json
 }
 
-// ── Buscar funcionário por CPF (reativa se estiver inativo) ─
-async function buscarFuncionario(cpf, empresaId) {
+// ── Buscar funcionário por CPF (reativa se inativo, resolve CBO se ausente) ─
+async function buscarFuncionario(cpf, empresaId, funcao) {
   const cpfBruto = (cpf || '').replace(/\D/g, '')
   if (cpfBruto.length !== 11) return null
   const cpfFmt = cpfBruto.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
   const { data } = await supabase.from('funcionarios')
-    .select('id, nome, ativo').eq('empresa_id', empresaId).eq('cpf', cpfFmt).single()
+    .select('id, nome, ativo, cod_cbo, funcao').eq('empresa_id', empresaId).eq('cpf', cpfFmt).single()
   if (!data) return null
-  if (!data.ativo) {
-    await supabase.from('funcionarios').update({ ativo: true }).eq('id', data.id)
+
+  const patch = {}
+  if (!data.ativo) patch.ativo = true
+  const funcaoEfetiva = funcao || data.funcao
+  if (!data.cod_cbo && funcaoEfetiva) {
+    const cbo = melhorCBO(funcaoEfetiva)
+    if (cbo) patch.cod_cbo = cbo.codigo
+  }
+  if (Object.keys(patch).length > 0) {
+    await supabase.from('funcionarios').update(patch).eq('id', data.id)
   }
   return data
 }
@@ -290,7 +299,7 @@ export default function Importar() {
 
       if (tipo_detectado === 'aso') {
         atualizarItem(item.id, { progresso: 'Verificando funcionário...' })
-        const func = await buscarFuncionario(dados.funcionario?.cpf, empId)
+        const func = await buscarFuncionario(dados.funcionario?.cpf, empId, dados.funcionario?.funcao)
 
         if (func) {
           atualizarItem(item.id, { progresso: 'Salvando ASO...' })
@@ -359,12 +368,15 @@ export default function Importar() {
     try {
       // Cria o funcionário
       const cpfFmt = fmtCPF(f.cpf)
+      const funcaoNovoFunc = f.funcao.trim() || null
+      const cboNovoFunc = funcaoNovoFunc ? melhorCBO(funcaoNovoFunc)?.codigo || null : null
       const { data: novoFunc, error: funcErr } = await supabase.from('funcionarios').insert({
         empresa_id: empresaId,
         nome: f.nome.trim(), cpf: cpfFmt,
         data_nasc: f.data_nasc || null, data_adm: f.data_adm || null,
         matricula_esocial: 'PEND-' + Date.now(),
-        funcao: f.funcao.trim() || null, setor: f.setor.trim() || null,
+        funcao: funcaoNovoFunc, setor: f.setor.trim() || null,
+        cod_cbo: cboNovoFunc,
         ativo: true,
       }).select().single()
       if (funcErr) throw new Error('Erro ao cadastrar: ' + funcErr.message)

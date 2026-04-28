@@ -897,3 +897,34 @@ export function buscarCBO(termo: string): CBO[] {
     return nome.includes(t) || cod.includes(t)
   }).slice(0, 10)
 }
+
+// Retorna o melhor CBO para uma fun\u00e7\u00e3o/cargo \u2014 sempre retorna algo se houver qualquer correspond\u00eancia
+export function melhorCBO(funcao: string): CBO | null {
+  if (!funcao || funcao.length < 2) return null
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+  const t = norm(funcao)
+  const palavras = t.split(/\s+/).filter(w => w.length > 3)
+
+  let best: CBO | null = null
+  let bestScore = 0
+
+  for (const c of CBO_DATA) {
+    const nome = norm(c.nome)
+    let score = 0
+
+    if (nome === t)              score = 100  // correspond\u00eancia exata
+    else if (nome.startsWith(t)) score = 85   // nome come\u00e7a com o termo
+    else if (t.startsWith(nome)) score = 75   // termo come\u00e7a com o nome (nome mais curto)
+    else if (nome.includes(t))   score = 65   // nome cont\u00e9m o termo
+    else if (t.includes(nome))   score = 55   // termo cont\u00e9m o nome
+    else if (palavras.length > 0) {
+      // correspond\u00eancia por palavras significativas
+      const acertos = palavras.filter(w => nome.includes(w)).length
+      if (acertos > 0) score = acertos * 25
+    }
+
+    if (score > bestScore) { bestScore = score; best = c }
+  }
+
+  return best
+}
