@@ -44,12 +44,13 @@ export default function Dashboard() {
     const em60 = new Date(hoje); em60.setDate(em60.getDate() + 60)
     const em90 = new Date(hoje); em90.setDate(em90.getDate() + 90)
 
-    const [funcsRes, asosRes, txRes, ltcatRes, catsRes] = await Promise.all([
+    const [funcsRes, asosRes, txRes, ltcatRes, catsRes, pcmsoRes] = await Promise.all([
       supabase.from('funcionarios').select('id, nome, cpf, data_adm, data_nasc, matricula_esocial, funcao, setor, ativo').eq('empresa_id', empresaId),
       supabase.from('asos').select('id, funcionario_id, tipo_aso, data_exame, prox_exame, conclusao').eq('empresa_id', empresaId).order('data_exame', { ascending: false }),
       supabase.from('transmissoes').select('id, evento, status, criado_em, recibo, dt_envio, funcionarios(nome)').eq('empresa_id', empresaId).order('criado_em', { ascending: false }),
       supabase.from('ltcats').select('id, data_emissao, prox_revisao, ativo, ghes').eq('empresa_id', empresaId).eq('ativo', true).limit(1).single(),
       supabase.from('cats').select('id, criado_em').eq('empresa_id', empresaId),
+      supabase.from('pcmso_programa').select('id, funcao, atualizado_em').eq('empresa_id', empresaId).order('atualizado_em', { ascending: false }),
     ])
 
     const funcs    = (funcsRes.data || []).filter(f => f.ativo)
@@ -57,6 +58,7 @@ export default function Dashboard() {
     const txs      = txRes.data || []
     const ltcat    = ltcatRes.data || null
     const cats     = catsRes.data || []
+    const pcmso    = pcmsoRes.data || []
 
     // Último ASO por funcionário
     const ultimoAso = (funcId) => asos.filter(a => a.funcionario_id === funcId)
@@ -151,6 +153,12 @@ export default function Dashboard() {
       desc: 'Necessário para transmitir S-2240',
       acao: 'Cadastrar LTCAT', rota: '/ltcat',
     })
+    if (pcmso.length === 0) alertasLista.push({
+      tipo: 'info', icon: '🩺',
+      titulo: 'PCMSO não cadastrado',
+      desc: 'Importe o PCMSO para controle de exames por função',
+      acao: 'Importar PCMSO', rota: '/importar',
+    })
     if (semAso.length > 0) alertasLista.push({
       tipo: 'info', icon: '🩺',
       titulo: `${semAso.length} funcionário(s) sem ASO`,
@@ -169,6 +177,8 @@ export default function Dashboard() {
       ltcat, ltcatVencido, ltcatVence30,
       ghes: ltcat?.ghes?.length || 0,
       cats: cats.length,
+      pcmso, pcmsoProgramas: pcmso.length,
+      pcmsoAtualizado: pcmso[0]?.atualizado_em || null,
     })
   }
 
@@ -298,31 +308,65 @@ export default function Dashboard() {
         {/* Ações rápidas + Info LTCAT */}
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
 
-          {/* LTCAT status */}
-          <div style={{ ...s.card, padding:'14px' }}>
-            <div style={s.cardTit}>📋 LTCAT</div>
-            {kpis?.ltcat ? (
-              <div style={{ marginTop:8 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                  {[
-                    { l:'Emissão', v: new Date(kpis.ltcat.data_emissao+'T12:00:00').toLocaleDateString('pt-BR') },
-                    { l:'GHEs', v: kpis.ghes },
-                    { l:'Próx. revisão', v: kpis.ltcat.prox_revisao ? new Date(kpis.ltcat.prox_revisao+'T12:00:00').toLocaleDateString('pt-BR') : '—' },
-                  ].map((it,i) => (
-                    <div key={i} style={{ background:'#f9fafb', borderRadius:8, padding:'7px 10px', textAlign:'center' }}>
-                      <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase' }}>{it.l}</div>
-                      <div style={{ fontSize:14, fontWeight:700, color: i===2&&kpis.ltcatVencido?'#E24B4A':i===2&&kpis.ltcatVence30?'#EF9F27':'#111', marginTop:2 }}>{it.v}</div>
-                    </div>
-                  ))}
+            {/* LTCAT + PCMSO lado a lado */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+
+            {/* LTCAT status */}
+            <div style={{ ...s.card, padding:'14px' }}>
+              <div style={s.cardTit}>📋 LTCAT</div>
+              {kpis?.ltcat ? (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                    {[
+                      { l:'Emissão', v: new Date(kpis.ltcat.data_emissao+'T12:00:00').toLocaleDateString('pt-BR') },
+                      { l:'GHEs', v: kpis.ghes },
+                      { l:'Próx. revisão', v: kpis.ltcat.prox_revisao ? new Date(kpis.ltcat.prox_revisao+'T12:00:00').toLocaleDateString('pt-BR') : '—', vencido: kpis.ltcatVencido, vence30: kpis.ltcatVence30 },
+                    ].map((it,i) => (
+                      <div key={i} style={{ background:'#f9fafb', borderRadius:8, padding:'7px 10px', textAlign:'center', gridColumn: i===2?'1/-1':undefined }}>
+                        <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase' }}>{it.l}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color: it.vencido?'#E24B4A':it.vence30?'#EF9F27':'#111', marginTop:2 }}>{it.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {kpis.ltcatVencido && <div style={{ marginTop:6, fontSize:11, color:'#E24B4A', fontWeight:500 }}>⚠ Revisão vencida</div>}
                 </div>
-                {kpis.ltcatVencido && <div style={{ marginTop:8, fontSize:11, color:'#E24B4A', fontWeight:500 }}>⚠ Revisão vencida — atualize o LTCAT</div>}
-              </div>
-            ) : (
-              <div style={{ marginTop:8, fontSize:12, color:'#E24B4A' }}>Nenhum LTCAT ativo.</div>
-            )}
-            <button onClick={() => router.push('/ltcat')} style={{ ...s.btnOutline, width:'100%', marginTop:10, fontSize:12 }}>
-              Gerenciar LTCAT →
-            </button>
+              ) : (
+                <div style={{ marginTop:8, fontSize:12, color:'#E24B4A' }}>Nenhum LTCAT ativo.</div>
+              )}
+              <button onClick={() => router.push('/ltcat')} style={{ ...s.btnOutline, width:'100%', marginTop:10, fontSize:11 }}>
+                Gerenciar LTCAT →
+              </button>
+            </div>
+
+            {/* PCMSO status */}
+            <div style={{ ...s.card, padding:'14px' }}>
+              <div style={s.cardTit}>🩺 PCMSO</div>
+              {kpis?.pcmsoProgramas > 0 ? (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                    {[
+                      { l:'Programas', v: kpis.pcmsoProgramas },
+                      { l:'Atualizado', v: kpis.pcmsoAtualizado ? new Date(kpis.pcmsoAtualizado).toLocaleDateString('pt-BR') : '—' },
+                    ].map((it,i) => (
+                      <div key={i} style={{ background:'#f9fafb', borderRadius:8, padding:'7px 10px', textAlign:'center' }}>
+                        <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase' }}>{it.l}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#111', marginTop:2 }}>{it.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop:6, fontSize:11, color:'#6b7280' }}>
+                    {(kpis.pcmso || []).slice(0,3).map((p: any) => p.funcao).join(', ')}
+                    {kpis.pcmsoProgramas > 3 ? ` +${kpis.pcmsoProgramas - 3}` : ''}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop:8, fontSize:12, color:'#E24B4A' }}>Nenhum PCMSO cadastrado.</div>
+              )}
+              <button onClick={() => router.push('/pcmso')} style={{ ...s.btnOutline, width:'100%', marginTop:10, fontSize:11 }}>
+                Gerenciar PCMSO →
+              </button>
+            </div>
+
           </div>
 
           {/* Ações rápidas */}
