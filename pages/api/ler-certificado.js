@@ -2,9 +2,13 @@
 // Lê metadados do .pfx sem armazenar chave privada
 
 import { checkRateLimit, getClientIP } from '../../lib/rate-limit'
+import { requireAuth } from '../../lib/auth-middleware'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
+
+  const user = await requireAuth(req, res)
+  if (!user) return
 
   const ip = getClientIP(req)
   const { limited, retryAfter } = checkRateLimit(ip, { windowMs: 60_000, max: 10 })

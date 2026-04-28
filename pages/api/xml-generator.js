@@ -2,9 +2,13 @@
 // Gera XML eSocial S-2220, S-2240 e S-2210 com códigos da Tabela 27
 
 import { checkRateLimit, getClientIP } from '../../lib/rate-limit'
+import { requireAuth } from '../../lib/auth-middleware'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
+
+  const user = await requireAuth(req, res)
+  if (!user) return
 
   const ip = getClientIP(req)
   const { limited, retryAfter } = checkRateLimit(ip, { windowMs: 60_000, max: 20 })
@@ -31,6 +35,9 @@ export default async function handler(req, res) {
 }
 
 // ─── HELPERS ─────────────────────────────────────────
+function escapeXml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+}
 function cnpj(v) { return (v || '').replace(/\D/g, '') }
 function cpf(v)  { return (v || '').replace(/\D/g, '') }
 function data(br) {
@@ -93,7 +100,7 @@ function gerarS2220(aso, empresa, tpAmb) {
           <dtExm>${data(dadosAso.data_exame)}</dtExm>
           <procRealizado>
             <codProc>${codigoExame(ex.nome)}</codProc>
-            <obsProc>${ex.nome}</obsProc>
+            <obsProc>${escapeXml(ex.nome)}</obsProc>
           </procRealizado>
           ${ex.resultado ? `<indResult>${ex.resultado === 'Normal' ? '1' : ex.resultado === 'Alterado' ? '2' : '3'}</indResult>` : ''}
         </exame>`).join('')
@@ -121,7 +128,7 @@ function gerarS2220(aso, empresa, tpAmb) {
       <tpAso>${TIPO_ASO[dadosAso.tipo_aso] || '1'}</tpAso>
       ${examesXML}
       <medico>
-        <nmMed>${dadosAso.medico_nome || ''}</nmMed>
+        <nmMed>${escapeXml(dadosAso.medico_nome)}</nmMed>
         <nrCRM>${(dadosAso.medico_crm || '').replace(/\D/g, '')}</nrCRM>
         <ufCRM>${(dadosAso.medico_crm || '').split('-').pop()?.trim().replace(/\d/g,'') || 'SP'}</ufCRM>
       </medico>
@@ -145,12 +152,12 @@ function gerarS2240(ltcat, empresa, tpAmb) {
     const agentesXML = (ghe.agentes || []).map(ag => `
         <agNoc>
           <tpAgt>${TIPO_AGENTE[ag.tipo] || '01'}</tpAgt>
-          <dsAgt>${ag.nome}</dsAgt>
-          ${ag.valor ? `<nrInsc>${ag.valor}</nrInsc>` : ''}
+          <dsAgt>${escapeXml(ag.nome)}</dsAgt>
+          ${ag.valor ? `<nrInsc>${escapeXml(ag.valor)}</nrInsc>` : ''}
           <ltcat>
-            <nrDocTec>${geral.resp_registro || ''}</nrDocTec>
-            <ideOC>${geral.resp_conselho || 'CREA'}</ideOC>
-            <dscAtvDes>${ag.nome} — ${ag.valor || 'não medido'}</dscAtvDes>
+            <nrDocTec>${escapeXml(geral.resp_registro)}</nrDocTec>
+            <ideOC>${escapeXml(geral.resp_conselho) || 'CREA'}</ideOC>
+            <dscAtvDes>${escapeXml(ag.nome)} — ${escapeXml(ag.valor) || 'não medido'}</dscAtvDes>
           </ltcat>
           <epcEpi>
             <utilizEpc>${(ghe.epc||[]).length > 0 ? 'S' : 'N'}</utilizEpc>
@@ -160,14 +167,14 @@ function gerarS2240(ltcat, empresa, tpAmb) {
             ${(ghe.epi||[]).map(e => `
             <epi>
               <caEPI>${(e.ca||'').replace(/\D/g,'')}</caEPI>
-              <dscEPI>${e.nome}</dscEPI>
+              <dscEPI>${escapeXml(e.nome)}</dscEPI>
             </epi>`).join('')}
           </epcEpi>
         </agNoc>`).join('')
 
     return `
       <infoAtiv>
-        <dscAtivDes>${ghe.nome}</dscAtivDes>
+        <dscAtivDes>${escapeXml(ghe.nome)}</dscAtivDes>
         ${agentesXML}
       </infoAtiv>`
   }).join('')
@@ -191,9 +198,9 @@ function gerarS2240(ltcat, empresa, tpAmb) {
       ${ghesXML}
       <respReg>
         <ideResponsavel>
-          <nmRespReg>${geral.resp_nome || ''}</nmRespReg>
-          <ideOC>${geral.resp_conselho || 'CREA'}</ideOC>
-          <nrOC>${geral.resp_registro || ''}</nrOC>
+          <nmRespReg>${escapeXml(geral.resp_nome)}</nmRespReg>
+          <ideOC>${escapeXml(geral.resp_conselho) || 'CREA'}</ideOC>
+          <nrOC>${escapeXml(geral.resp_registro)}</nrOC>
         </ideResponsavel>
       </respReg>
     </infoExpRisco>
@@ -235,15 +242,15 @@ function gerarS2210(cat, empresa, tpAmb) {
       <dtAcid>${data(cat.dt_acidente)}</dtAcid>
       ${cat.hora_acidente ? `<hrAcid>${cat.hora_acidente}</hrAcid>` : ''}
       <tpAcid>${TIPO_CAT[cat.tipo_cat] || '1'}</tpAcid>
-      <dscLesao>${cat.natureza_lesao || ''}</dscLesao>
-      <dscCompLesao>${cat.descricao || ''}</dscCompLesao>
-      <diagProvavel>${descDiag}</diagProvavel>
-      <codCID>${cat.cid}</codCID>
+      <dscLesao>${escapeXml(cat.natureza_lesao)}</dscLesao>
+      <dscCompLesao>${escapeXml(cat.descricao)}</dscCompLesao>
+      <diagProvavel>${escapeXml(descDiag)}</diagProvavel>
+      <codCID>${escapeXml(cat.cid)}</codCID>
       ${cat.houve_morte ? `<infoObito><dtObito>${dtObito}</dtObito></infoObito>` : ''}
       <atendimento>
         <dtAtendimento>${data(atend.data) || data(cat.dt_acidente)}</dtAtendimento>
         ${atend.hora ? `<hrAtendimento>${atend.hora}</hrAtendimento>` : ''}
-        <nmMedico>${atend.medico || ''}</nmMedico>
+        <nmMedico>${escapeXml(atend.medico)}</nmMedico>
         <nrCRM>${(atend.crm || '').replace(/\D/g,'')}</nrCRM>
         <ufCRM>${(atend.crm || '').split('-').pop()?.trim().replace(/\d/g,'') || 'SP'}</ufCRM>
       </atendimento>

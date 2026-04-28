@@ -2,6 +2,7 @@
 // Transmite eventos assinados ao webservice SOAP do eSocial
 
 import { checkRateLimit, getClientIP } from '../../lib/rate-limit'
+import { requireAuth } from '../../lib/auth-middleware'
 
 const ENDPOINTS = {
   producao_restrita: 'https://webservices.producaorestrita.esocial.gov.br/servicos/empregador/envioLoteEventos/enviarLoteEventos/v1_1_0/index.php',
@@ -10,6 +11,9 @@ const ENDPOINTS = {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
+
+  const user = await requireAuth(req, res)
+  if (!user) return
 
   const ip = getClientIP(req)
   const { limited, retryAfter } = checkRateLimit(ip, { windowMs: 60_000, max: 10 })

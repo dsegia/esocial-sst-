@@ -3,6 +3,7 @@
 // O .pfx e a senha NUNCA são armazenados — usados apenas em memória
 
 import { checkRateLimit, getClientIP } from '../../lib/rate-limit'
+import { requireAuth } from '../../lib/auth-middleware'
 
 // Extrai o elemento a ser assinado e propaga namespaces do pai (<eSocial>).
 // O XMLDSig Reference URI="#id" exige que o digest cubra apenas esse elemento
@@ -55,6 +56,9 @@ function extrairElementoParaDigest(xml, elemId, tagEvento) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido' })
+
+  const user = await requireAuth(req, res)
+  if (!user) return
 
   const ip = getClientIP(req)
   const { limited, retryAfter } = checkRateLimit(ip, { windowMs: 60_000, max: 10 })

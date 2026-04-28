@@ -24,15 +24,22 @@ export default async function handler(req, res) {
   if (!solicitante?.empresa_id) return res.status(403).json({ erro: 'Usuário sem empresa associada' })
 
   const empresaId = solicitante.empresa_id
+
+  // Verifica se o solicitante é admin da empresa
+  const sbAdmin = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  const { data: acesso } = await sbAdmin.from('usuario_empresas')
+    .select('perfil').eq('usuario_id', user.id).eq('empresa_id', empresaId).single()
+  if (!acesso || acesso.perfil !== 'admin') {
+    return res.status(403).json({ erro: 'Apenas administradores podem convidar usuários' })
+  }
+
   const { email, nome, perfil = 'operador' } = req.body
   const PERFIS_VALIDOS = ['admin', 'operador', 'visualizador']
   if (!PERFIS_VALIDOS.includes(perfil)) return res.status(400).json({ erro: 'Perfil inválido' })
 
   if (!email || !email.includes('@')) return res.status(400).json({ erro: 'E-mail inválido' })
 
-  const sb = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  })
+  const sb = sbAdmin
 
   // Verifica se o e-mail já é usuário desta empresa
   const { data: jaExiste } = await sb.from('usuarios')

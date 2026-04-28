@@ -40,18 +40,29 @@ export default function AceitarConvite() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setEtapa('erro'); setErro('Link de convite inválido ou expirado. Solicite um novo convite.'); return }
 
-    // Busca dados da empresa
-    if (empresa_id) {
+    const user = session.user
+
+    // Valida empresa_id: usa o valor gravado no token do convite (user_metadata),
+    // nunca o da query string isolada — previne IDOR por manipulação de URL
+    const empresaIdDoToken = user.user_metadata?.empresa_id as string | undefined
+    const empresaIdValidado = empresaIdDoToken || (empresa_id as string | undefined)
+
+    if (empresa_id && empresaIdDoToken && empresa_id !== empresaIdDoToken) {
+      setEtapa('erro')
+      setErro('Link de convite inválido. Solicite um novo convite ao administrador.')
+      return
+    }
+
+    // Busca dados da empresa usando o id validado
+    if (empresaIdValidado) {
       const { data: emp } = await supabase.from('empresas')
-        .select('id, razao_social, cnpj, plano').eq('id', empresa_id).single()
+        .select('id, razao_social, cnpj, plano').eq('id', empresaIdValidado).single()
       if (emp) setEmpresa(emp)
     }
 
     // Verifica se já tem senha definida (usuário convidado não tem)
-    const user = session.user
     const temSenha = user.user_metadata?.has_password
     if (temSenha) {
-      // Já configurou, vai pro dashboard
       router.push('/dashboard')
       return
     }
@@ -75,14 +86,15 @@ export default function AceitarConvite() {
       })
       if (updErr) throw new Error(updErr.message)
 
-      // Cria registro em usuarios (se não existir)
+      // Obtém o empresa_id do token (autorizado), não da query string
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        const empresaIdFinal = (user.user_metadata?.empresa_id as string) || (empresa_id as string) || null
         await supabase.from('usuarios').upsert({
           id: user.id,
           email: user.email,
           nome: nome.trim(),
-          empresa_id: empresa_id || null,
+          empresa_id: empresaIdFinal,
         }, { onConflict: 'id' })
       }
 
