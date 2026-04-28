@@ -655,38 +655,38 @@ export default function Home() {
           <h2 className="section-h2">Simples e <span className="grad">transparente</span></h2>
           <p className="section-desc">Comece grátis e escolha o plano ideal para sua operação.</p>
           <div className="pricing-grid">
-            {/* Starter */}
+            {/* Micro */}
             <div className="price-card">
-              <div className="price-plan">Starter</div>
-              <div className="price-amount">R$ 167<span>/mês</span></div>
-              <p className="price-desc">Para empresas com até 50 funcionários.</p>
+              <div className="price-plan">Micro</div>
+              <div className="price-amount">R$ 49<span>/mês</span></div>
+              <p className="price-desc">50 envios incluídos · R$ 1,90 por envio extra.</p>
               <ul className="price-list" style={{ textAlign:'left' }}>
-                {['Até 50 funcionários','ASO, LTCAT e PCMSO ilimitados','Importação por IA (PDF)','Transmissão eSocial S-2210/2220/2221/2240','Alertas de vencimento','Exportação de PDF'].map((item,i) => (
+                {['50 envios/mês incluídos','Importação por IA (PDF)','ASO, LTCAT e PCMSO','Transmissão eSocial S-2210/2220/2221/2240','Alertas de vencimento','Exportação de PDF'].map((item,i) => (
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
               <a href="/cadastro" className="price-btn price-btn-ghost">Começar grátis</a>
             </div>
-            {/* Professional */}
+            {/* Starter */}
             <div className="price-card featured">
               <div className="price-pill">Mais popular</div>
-              <div className="price-plan">Professional</div>
-              <div className="price-amount">R$ 397<span>/mês</span></div>
-              <p className="price-desc">Para escritórios de SST com múltiplas empresas.</p>
+              <div className="price-plan">Starter</div>
+              <div className="price-amount">R$ 97<span>/mês</span></div>
+              <p className="price-desc">100 envios incluídos · R$ 1,50 por envio extra.</p>
               <ul className="price-list" style={{ textAlign:'left' }}>
-                {['Até 300 funcionários','Tudo do Starter','Multi-empresa (até 5 CNPJs)','Convite de usuários','Relatórios avançados','Suporte por e-mail'].map((item,i) => (
+                {['100 envios/mês incluídos','Tudo do Micro','Multi-empresa (até 5 CNPJs)','Convite de usuários','Relatórios avançados','Suporte por e-mail'].map((item,i) => (
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
               <a href="/cadastro" className="price-btn price-btn-main">Começar grátis</a>
             </div>
-            {/* Business */}
+            {/* Pro */}
             <div className="price-card">
-              <div className="price-plan">Business</div>
-              <div className="price-amount">R$ 697<span>/mês</span></div>
-              <p className="price-desc">Para grandes operações com múltiplos CNPJs.</p>
+              <div className="price-plan">Pro</div>
+              <div className="price-amount">R$ 197<span>/mês</span></div>
+              <p className="price-desc">400 envios incluídos · R$ 1,20 por envio extra.</p>
               <ul className="price-list" style={{ textAlign:'left' }}>
-                {['Até 1.000 funcionários','Tudo do Professional','Até 10 CNPJs','API de integração','Suporte prioritário','Onboarding dedicado'].map((item,i) => (
+                {['400 envios/mês incluídos','Tudo do Starter','Até 10 CNPJs','Suporte prioritário','Onboarding dedicado','Envios excedentes automáticos'].map((item,i) => (
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
@@ -694,7 +694,7 @@ export default function Home() {
             </div>
           </div>
           <p style={{ textAlign:'center', marginTop:28, fontSize:12, color:'#334155' }}>
-            Todos os planos incluem 14 dias grátis · Sem contrato · Cancele quando quiser
+            Todos os planos incluem 14 dias grátis · Mensalidade fixa + envios incluídos · Cancele quando quiser
           </p>
         </div>
       </section>
