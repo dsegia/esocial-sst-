@@ -290,7 +290,7 @@ async function lerComClaude(pdf_base64, texto_pdf, paginas, tipo, anthropicKey) 
     }
     throw new Error('JSON inválido na resposta do Claude')
   } catch (err) {
-    console.log('Claude falhou (' + err.message.substring(0,100) + '), usando Gemini como fallback')
+    console.error('[ler-doc] Claude falhou:', err.message.substring(0,100))
     return null
   }
 }
@@ -344,7 +344,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ sucesso: true, ...claudeResult })
     }
     logIA('claude', 'claude-sonnet', 'fallback', Date.now() - _t0claude, tipo)
-    console.log(`Claude falhou para ${tipo.toUpperCase()}, tentando Gemini como fallback`)
+    console.error(`[ler-doc] Claude falhou para ${tipo.toUpperCase()}, tentando Gemini`)
   }
 
   const prompt_aso = `Você é um extrator de dados de ASO brasileiro. Analise o documento e retorne SOMENTE o JSON abaixo preenchido. Não escreva nada antes ou depois do JSON. Campos não encontrados devem ser null.
@@ -472,7 +472,7 @@ REGRAS CRÍTICAS:
           const err = await response.json()
           if ([429,503].includes(err?.error?.code)) {
             logIA('gemini', modelo, 'fallback', Date.now() - _t0gem, tipo, `quota/503`)
-            console.log(`${modelo}: quota/503, tentando próximo`); continue
+            continue
           }
           throw new Error(JSON.stringify(err))
         }
@@ -490,7 +490,7 @@ REGRAS CRÍTICAS:
         }
       } catch (err) {
         logIA('gemini', modelo, 'erro', Date.now() - _t0gem, tipo, err.message)
-        console.log(`Erro ${modelo}:`, err.message); continue
+        console.error(`[ler-doc] Erro ${modelo}:`, err.message); continue
       }
     }
   }

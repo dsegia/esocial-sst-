@@ -36,12 +36,14 @@ export default function TransmissaoManual() {
   const [certSenha, setCertSenha] = useState('')
   const [certInfo, setCertInfo] = useState(null)
   const [pfxBase64, setPfxBase64] = useState('')
+  const [sessionToken, setSessionToken] = useState('')
 
   useEffect(() => { init() }, [])
 
   async function init() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return }
+    setSessionToken(session.access_token)
     const { data: user } = await supabase.from('usuarios')
       .select('empresa_id, empresas(razao_social, cnpj, cert_digital_validade, cert_titular, plano)')
       .eq('id', session.user.id).single()
@@ -62,7 +64,9 @@ export default function TransmissaoManual() {
     setTestando(true)
     setTesteResult(null)
     try {
-      const resp = await fetch(`/api/testar-conexao-esocial?ambiente=${ambiente}`)
+      const resp = await fetch(`/api/testar-conexao-esocial?ambiente=${ambiente}`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      })
       const data = await resp.json()
       if (data.conectado) {
         setTesteResult({ ok: true, msg: `Conexão OK — Gov.br respondeu em ${data.latencia_ms}ms. ${data.descricao || ''}`, latencia: data.latencia_ms })
@@ -88,7 +92,7 @@ export default function TransmissaoManual() {
 
       const resp = await fetch('/api/ler-certificado', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
         body: JSON.stringify({ pfx: base64, senha: certSenha })
       })
       const data = await resp.json()
@@ -168,9 +172,10 @@ export default function TransmissaoManual() {
         if (!dadosEvento) throw new Error(`Dados do evento não encontrados (tipo: ${txCompleta.referencia_tipo}, id: ${txCompleta.referencia_id})`)
 
         // 2. Gerar XML
+        const authHeader = { Authorization: `Bearer ${sessionToken}` }
         const xmlResp = await fetch('/api/xml-generator', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify({
             tipo: txCompleta.evento,
             dados: dadosEvento,
@@ -187,7 +192,7 @@ export default function TransmissaoManual() {
         const TAG_MAP = { 'S-2220':'evtMonit', 'S-2240':'evtExpRisco', 'S-2210':'evtCAT' }
         const assinarResp = await fetch('/api/assinar-xml', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify({
             xml: xmlData.xml,
             pfx: pfxBase64,
@@ -203,7 +208,7 @@ export default function TransmissaoManual() {
         // 4. Transmitir ao Gov.br
         const transmitirResp = await fetch('/api/transmitir-esocial', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify({
             xml_assinado: assinarData.xml_assinado,
             cnpj_empregador: empresa.cnpj,
@@ -212,6 +217,10 @@ export default function TransmissaoManual() {
           })
         })
         const transmitirData = await transmitirResp.json()
+
+        if (transmitirResp.status === 402 || transmitirData.sem_creditos) {
+          throw new Error('Créditos de envio esgotados. Acesse /planos para adquirir mais envios.')
+        }
 
         if (transmitirData.sucesso) {
           // Atualizar status no banco

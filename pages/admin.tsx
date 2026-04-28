@@ -44,7 +44,7 @@ type Totais = {
   funcionarios: number
 }
 
-const PLANOS = ['trial', 'starter', 'professional', 'business', 'cancelado']
+const PLANOS = ['trial', 'micro', 'starter', 'pro', 'professional', 'business', 'cancelado']
 
 export default function Admin() {
   const router = useRouter()
@@ -974,9 +974,11 @@ export default function Admin() {
                       onChange={e => setConviteForm(f => ({ ...f, plano: e.target.value }))}
                     >
                       <option value="trial">Trial (14 dias grátis)</option>
-                      <option value="starter">Starter</option>
-                      <option value="professional">Professional</option>
-                      <option value="business">Business</option>
+                      <option value="micro">Micro (R$ 49/mês)</option>
+                      <option value="starter">Starter (R$ 97/mês)</option>
+                      <option value="pro">Pro (R$ 197/mês)</option>
+                      <option value="professional">Professional (legado)</option>
+                      <option value="business">Business (legado)</option>
                     </select>
                   </div>
 
