@@ -13,7 +13,7 @@ const PLANOS = {
     nome: 'Micro',
     priceId: process.env.STRIPE_PRICE_MICRO,
     priceIdExcedente: process.env.STRIPE_PRICE_MICRO_EXCEDENTE,
-    creditos: 30,
+    creditos: 50,
     maxFuncionarios: 50,
   },
   starter: {

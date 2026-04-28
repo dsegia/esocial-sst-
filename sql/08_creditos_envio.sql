@@ -22,7 +22,7 @@ ALTER TABLE empresas
 
 -- 3. Preenche créditos para empresas existentes
 UPDATE empresas SET creditos_restantes = 10,   creditos_incluidos = 10   WHERE plano = 'trial'                      AND creditos_restantes = 0;
-UPDATE empresas SET creditos_restantes = 30,   creditos_incluidos = 30   WHERE plano = 'micro'                      AND creditos_restantes = 0;
+UPDATE empresas SET creditos_restantes = 50,   creditos_incluidos = 50   WHERE plano = 'micro'                      AND creditos_restantes = 0;
 UPDATE empresas SET creditos_restantes = 100,  creditos_incluidos = 100  WHERE plano = 'starter'                    AND creditos_restantes = 0;
 UPDATE empresas SET creditos_restantes = 400,  creditos_incluidos = 400  WHERE plano = 'pro'                        AND creditos_restantes = 0;
 UPDATE empresas SET creditos_restantes = 9999, creditos_incluidos = 9999 WHERE plano IN ('business','enterprise')   AND creditos_restantes = 0;

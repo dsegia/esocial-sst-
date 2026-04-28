@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   // Verifica e consome crédito de envio
   const { data: empresa } = await sbAdmin
     .from('empresas')
-    .select('id, plano, creditos_restantes, stripe_metered_item_id')
+    .select('id, plano, creditos_restantes, stripe_customer_id')
     .eq('id', empresaId).single()
 
   if (!empresa) return res.status(403).json({ erro: 'Empresa não encontrada' })
@@ -51,13 +51,16 @@ export default async function handler(req, res) {
     await sbAdmin.from('empresas')
       .update({ creditos_restantes: empresa.creditos_restantes - 1 })
       .eq('id', empresaId)
-  } else if (empresa.stripe_metered_item_id && process.env.STRIPE_SECRET_KEY) {
-    // Créditos esgotados — registra uso metered no Stripe (cobrado no fechamento do ciclo)
+  } else if (empresa.stripe_customer_id && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_METER_ENVIOS) {
+    // Créditos esgotados — registra evento no meter do Stripe (cobrado no fechamento do ciclo)
     try {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' })
-      await stripe.subscriptionItems.createUsageRecord(empresa.stripe_metered_item_id, {
-        quantity: 1,
-        action: 'increment',
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-03-31.basil' })
+      await stripe.billing.meterEvents.create({
+        event_name: 'esocial_envio',
+        payload: {
+          value: '1',
+          stripe_customer_id: empresa.stripe_customer_id,
+        },
       })
     } catch (err) {
       console.error('[transmitir] erro ao registrar uso metered:', err?.message)

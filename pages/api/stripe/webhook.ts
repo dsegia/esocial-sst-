@@ -13,7 +13,7 @@ const supabaseAdmin = createClient(
 )
 
 const CREDITOS_POR_PLANO: Record<string, number> = {
-  micro:        30,
+  micro:        50,
   starter:      100,
   pro:          400,
   professional: 100,
