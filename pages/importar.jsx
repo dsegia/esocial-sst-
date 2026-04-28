@@ -90,7 +90,7 @@ async function carregarPdfJs() {
 }
 
 // ── Extrai texto e chama API ──────────────────────────────
-async function processarArquivo(file, onProgresso) {
+async function processarArquivo(file, onProgresso, token) {
   onProgresso('Carregando PDF...')
   const lib = await carregarPdfJs()
   const arrayBuf = await file.arrayBuffer()
@@ -131,7 +131,8 @@ async function processarArquivo(file, onProgresso) {
 
   onProgresso('Identificando com IA...')
   const resp = await fetch('/api/ler-documento', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),
   })
   let json
@@ -221,6 +222,7 @@ export default function Importar() {
   const router = useRouter()
   const fileRef = useRef()
   const [empresaId, setEmpresaId] = useState('')
+  const [sessionToken, setSessionToken] = useState('')
   const [fila, setFila] = useState([])
   const [processando, setProcessando] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -229,6 +231,7 @@ export default function Importar() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push('/login'); return }
+      setSessionToken(session.access_token)
       supabase.from('usuarios').select('empresa_id').eq('id', session.user.id).single()
         .then(({ data: u }) => {
           if (!u) { router.push('/login'); return }
@@ -270,7 +273,7 @@ export default function Importar() {
     atualizarItem(item.id, { estado: 'processando', progresso: 'Iniciando...' })
     try {
       const resultado = await processarArquivo(item.file, msg =>
-        atualizarItem(item.id, { progresso: msg })
+        atualizarItem(item.id, { progresso: msg }), sessionToken
       )
       const { tipo_detectado, dados } = resultado
 
