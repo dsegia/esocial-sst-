@@ -39,7 +39,7 @@ export default function S2220() {
 
     const [funcsRes, asosRes, txRes] = await Promise.all([
       supabase.from('funcionarios')
-        .select('id,nome,cpf,matricula_esocial,funcao,setor,data_adm,data_nasc')
+        .select('id,nome,cpf,matricula_esocial,funcao,cod_cbo,setor,data_adm,data_nasc')
         .eq('empresa_id', empId).eq('ativo', true).order('nome'),
       supabase.from('asos').select('*')
         .eq('empresa_id', empId)
