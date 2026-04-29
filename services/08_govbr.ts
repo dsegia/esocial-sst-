@@ -1,8 +1,6 @@
 import https from 'https'
-import { supabase } from '../lib/supabase'
 import { atualizarTransmissao } from './09_sst'
 
-// ─── CONFIGURAÇÃO ────────────────────────────────────────
 const ESOCIAL_URL = {
   producao_restrita: 'https://restrito.esocial.gov.br/services/rest',
   producao:          'https://esocial.gov.br/services/rest',
@@ -10,28 +8,25 @@ const ESOCIAL_URL = {
 
 export type AmbienteESocial = 'producao_restrita' | 'producao'
 
-// ─── ENVIAR LOTE AO GOV.BR ───────────────────────────────
-// Em produção real, o XML precisa estar assinado com ICP-Brasil
-// antes de chamar esta função (ver assinar.ts)
 export async function enviarLote(params: {
   transmissaoId: string
   empresaId: string
   cnpj: string
   xmlAssinado: string
   ambiente: AmbienteESocial
+  pfxBuffer: Buffer
+  certSenha: string
 }): Promise<{ sucesso: boolean; recibo?: string; erro?: string }> {
-  const { transmissaoId, empresaId, cnpj, xmlAssinado, ambiente } = params
+  const { transmissaoId, cnpj, xmlAssinado, ambiente, pfxBuffer, certSenha } = params
 
-  // Monta o envelope SOAP
   const soap = montarEnvelopeSOAP(cnpj, xmlAssinado)
 
   try {
-    const resposta = await chamarWebservice(soap, ambiente)
+    const resposta = await chamarWebservice(soap, ambiente, pfxBuffer, certSenha)
     const recibo = extrairRecibo(resposta)
     const erroGov = extrairErro(resposta)
 
     if (recibo) {
-      // Sucesso — atualiza a transmissão no banco
       await atualizarTransmissao(transmissaoId, {
         status: 'enviado',
         recibo,
@@ -41,7 +36,6 @@ export async function enviarLote(params: {
       })
       return { sucesso: true, recibo }
     } else {
-      // Rejeição
       await atualizarTransmissao(transmissaoId, {
         status: 'rejeitado',
         erro_codigo: erroGov?.codigo || 'UNKNOWN',
@@ -62,10 +56,8 @@ export async function enviarLote(params: {
   }
 }
 
-// ─── MONTAR ENVELOPE SOAP ────────────────────────────────
 function montarEnvelopeSOAP(cnpj: string, xmlEvento: string): string {
   const cnpjRaw = cnpj.replace(/\D/g, '')
-  const timestamp = new Date().toISOString()
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope
@@ -97,8 +89,12 @@ function montarEnvelopeSOAP(cnpj: string, xmlEvento: string): string {
 </soapenv:Envelope>`
 }
 
-// ─── CHAMADA HTTP AO WEBSERVICE ──────────────────────────
-function chamarWebservice(soap: string, ambiente: AmbienteESocial): Promise<string> {
+function chamarWebservice(
+  soap: string,
+  ambiente: AmbienteESocial,
+  pfxBuffer: Buffer,
+  certSenha: string,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = new URL(ESOCIAL_URL[ambiente] + '/WsSST.svc')
     const body = Buffer.from(soap, 'utf-8')
@@ -112,9 +108,8 @@ function chamarWebservice(soap: string, ambiente: AmbienteESocial): Promise<stri
         'Content-Length': body.length,
         'SOAPAction': '"EnviarLoteEventos"',
       },
-      // Em produção: adicionar certificado mTLS aqui
-      // key: fs.readFileSync('cert.key'),
-      // cert: fs.readFileSync('cert.pem'),
+      pfx: pfxBuffer,
+      passphrase: certSenha,
     }, (res) => {
       let data = ''
       res.on('data', chunk => { data += chunk })
@@ -127,13 +122,11 @@ function chamarWebservice(soap: string, ambiente: AmbienteESocial): Promise<stri
   })
 }
 
-// ─── EXTRAIR RECIBO DA RESPOSTA XML ──────────────────────
 function extrairRecibo(xml: string): string | null {
   const match = xml.match(/<nrRec>([^<]+)<\/nrRec>/)
   return match ? match[1] : null
 }
 
-// ─── EXTRAIR ERRO DA RESPOSTA XML ────────────────────────
 function extrairErro(xml: string): { codigo: string; descricao: string } | null {
   const codigoMatch = xml.match(/<codigo>([^<]+)<\/codigo>/)
   const descMatch = xml.match(/<descricao>([^<]+)<\/descricao>/)
@@ -146,8 +139,7 @@ function extrairErro(xml: string): { codigo: string; descricao: string } | null 
   return null
 }
 
-// ─── CONSULTAR SITUAÇÃO DO LOTE ──────────────────────────
-export async function consultarLote(nrRec: string, cnpj: string, ambiente: AmbienteESocial) {
+export async function consultarLote(nrRec: string, cnpj: string, ambiente: AmbienteESocial, pfxBuffer: Buffer, certSenha: string) {
   const cnpjRaw = cnpj.replace(/\D/g, '')
   const soap = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -169,6 +161,5 @@ export async function consultarLote(nrRec: string, cnpj: string, ambiente: Ambie
   </soapenv:Body>
 </soapenv:Envelope>`
 
-  const resposta = await chamarWebservice(soap, ambiente)
-  return resposta
+  return chamarWebservice(soap, ambiente, pfxBuffer, certSenha)
 }

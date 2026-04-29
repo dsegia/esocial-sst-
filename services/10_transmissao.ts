@@ -65,6 +65,8 @@ export async function transmitirS2220(params: {
     cnpj: empresa.cnpj,
     xmlAssinado,
     ambiente,
+    pfxBuffer,
+    certSenha,
   })
 
   return { ...resultado, transmissaoId: tx.id, xmlGerado: xml }
@@ -107,6 +109,8 @@ export async function transmitirS2240(params: {
     cnpj: empresa.cnpj,
     xmlAssinado,
     ambiente,
+    pfxBuffer,
+    certSenha,
   })
 
   return { ...resultado, transmissaoId: tx.id, xmlGerado: xml }
@@ -151,6 +155,8 @@ export async function transmitirS2210(params: {
     cnpj: empresa.cnpj,
     xmlAssinado,
     ambiente,
+    pfxBuffer,
+    certSenha,
   })
 
   return { ...resultado, transmissaoId: tx.id, xmlGerado: xml }
