@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -7,8 +7,8 @@ import { buscarCBO, melhorCBO, type CBO } from '../lib/cbo'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const formVazio = () => ({ nome:'', cpf:'', data_nasc:'', data_adm:'', matricula_esocial:'', funcao:'', cod_cbo:'', setor:'', vinculo:'CLT', turno:'Diurno' })
@@ -26,7 +26,7 @@ function gerarModeloCSV() {
   URL.revokeObjectURL(url)
 }
 
-function parsarData(s) {
+function parsarData(s: string | null | undefined): string | null {
   if (!s || !s.trim()) return null
   if (s.includes('/')) {
     const [d,m,a] = s.split('/')
@@ -39,18 +39,18 @@ function parsarData(s) {
 export default function Funcionarios() {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState('')
-  const [lista, setLista] = useState([])
+  const [lista, setLista] = useState<any[]>([])
   const [busca, setBusca] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [mostrarForm, setMostrarForm] = useState(false)
-  const [funcEditando, setFuncEditando] = useState(null)
+  const [funcEditando, setFuncEditando] = useState<any>(null)
   const [form, setForm] = useState(formVazio())
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState('')
   // Importar planilha
   const [importando, setImportando] = useState(false)
-  const [previewImport, setPreviewImport] = useState([])
-  const [errosImport, setErrosImport] = useState([])
+  const [previewImport, setPreviewImport] = useState<any[]>([])
+  const [errosImport, setErrosImport] = useState<any[]>([])
   const [mostrarImport, setMostrarImport] = useState(false)
   const [salvandoImport, setSalvandoImport] = useState(false)
   const [cboSugestoes, setCboSugestoes] = useState<CBO[]>([])
@@ -79,7 +79,7 @@ export default function Funcionarios() {
     setCarregando(false)
   }
 
-  async function carregar(eId, q) {
+  async function carregar(eId: string, q: string) {
     let query = supabase.from('funcionarios').select('*').eq('empresa_id', eId).eq('ativo', true).order('nome')
     if (q) query = query.or(`nome.ilike.%${q}%,cpf.ilike.%${q}%,matricula_esocial.ilike.%${q}%`)
     const { data } = await query
@@ -94,7 +94,7 @@ export default function Funcionarios() {
     setTimeout(() => document.getElementById('campo-nome')?.focus(), 100)
   }
 
-  function abrirEditar(f) {
+  function abrirEditar(f: any) {
     setFuncEditando(f)
     setForm({
       nome: f.nome || '', cpf: f.cpf || '',
@@ -123,7 +123,7 @@ export default function Funcionarios() {
     return r === parseInt(n[10])
   }
 
-  async function salvar(e) {
+  async function salvar(e: React.FormEvent) {
     e.preventDefault()
     setErro(''); setSucesso('')
     if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return }
@@ -181,22 +181,22 @@ export default function Funcionarios() {
     carregar(empresaId, busca)
   }
 
-  async function desativar(id, nome) {
+  async function desativar(id: string, nome: string) {
     if (!confirm(`Excluir ${nome} permanentemente? Todos os ASOs e transmissões vinculados também serão removidos.`)) return
     await supabase.from('funcionarios').delete().eq('id', id)
     carregar(empresaId, busca)
   }
 
-  function lerPlanilha(file) {
+  function lerPlanilha(file: File) {
     setImportando(true); setErrosImport([]); setPreviewImport([])
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const texto = e.target.result
-      const linhas = texto.split(/\r?\n/).filter(l => l.trim())
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      const texto = e.target!.result as string
+      const linhas = texto.split(/\r?\n/).filter((l: string) => l.trim())
       if (linhas.length < 2) { setErrosImport(['Arquivo vazio ou sem dados.']); setImportando(false); return }
       const sep = linhas[0].includes(';') ? ';' : ','
       const header = linhas[0].split(sep).map(h => h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'_'))
-      const idx = (termos) => { for (const t of termos) { const i = header.findIndex(h => h.includes(t)); if (i >= 0) return i } return -1 }
+      const idx = (termos: string[]) => { for (const t of termos) { const i = header.findIndex((h: string) => h.includes(t)); if (i >= 0) return i } return -1 }
       const idxNome  = idx(['nome'])
       const idxCPF   = idx(['cpf'])
       const idxNasc  = idx(['nasc'])
@@ -207,9 +207,9 @@ export default function Funcionarios() {
       const idxVinc  = idx(['vinculo'])
       const idxTurno = idx(['turno'])
       if (idxNome < 0 || idxCPF < 0) { setErrosImport(['Colunas Nome e CPF são obrigatórias.']); setImportando(false); return }
-      const erros = []
-      const funcionarios = []
-      linhas.slice(1).forEach((linha, i) => {
+      const erros: string[] = []
+      const funcionarios: any[] = []
+      linhas.slice(1).forEach((linha: string, i: number) => {
         if (!linha.trim()) return
         const cols = linha.split(sep).map(c => c.trim().replace(/^"|"$/g,''))
         const nome = idxNome >= 0 ? cols[idxNome] : ''
@@ -265,14 +265,14 @@ export default function Funcionarios() {
     carregar(empresaId, busca)
   }
 
-  function fmtCPF(v) {
+  function fmtCPF(v: string) {
     return v.replace(/\D/g,'').substring(0,11)
       .replace(/(\d{3})(\d)/,'$1.$2')
       .replace(/(\d{3})\.(\d{3})(\d)/,'$1.$2.$3')
       .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/,'$1.$2.$3-$4')
   }
 
-  const dadosIncompletos = (f) =>
+  const dadosIncompletos = (f: any) =>
     !f.data_adm || !f.data_nasc || !f.cod_cbo ||
     !f.matricula_esocial || f.matricula_esocial.startsWith('PEND-') || f.matricula_esocial.startsWith('AUTO-')
 
@@ -294,7 +294,7 @@ export default function Funcionarios() {
           <label style={{ ...s.btnOutline, cursor:'pointer', display:'inline-flex', alignItems:'center' }}>
             ↑ Importar planilha
             <input type="file" accept=".csv,.xlsx" style={{ display:'none' }}
-              onChange={e => e.target.files[0] && lerPlanilha(e.target.files[0])} />
+              onChange={e => e.target.files?.[0] && lerPlanilha(e.target.files[0])} />
           </label>
           <button style={s.btnPrimary} onClick={abrirNovo}>+ Adicionar</button>
         </div>
@@ -546,7 +546,7 @@ export default function Funcionarios() {
   )
 }
 
-const s = {
+const s: Record<string, React.CSSProperties> = {
   loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
   header:     { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem' },
   titulo:     { fontSize:20, fontWeight:700, color:'#111' },

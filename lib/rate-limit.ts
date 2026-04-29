@@ -27,11 +27,11 @@ export function checkRateLimit(
 // Cleanup entries older than 10 minutes to avoid memory leak
 setInterval(() => {
   const cutoff = Date.now() - 600_000
-  for (const [key, timestamps] of store) {
-    const fresh = timestamps.filter(t => t > cutoff)
+  Array.from(store.entries()).forEach(([key, timestamps]) => {
+    const fresh = timestamps.filter((t: number) => t > cutoff)
     if (fresh.length === 0) store.delete(key)
     else store.set(key, fresh)
-  }
+  })
 }, 300_000)
 
 export function getClientIP(req: { headers: Record<string, string | string[] | undefined>; socket?: { remoteAddress?: string } }): string {

@@ -1,6 +1,6 @@
 import https from 'https'
 import { supabase } from '../lib/supabase'
-import { atualizarTransmissao } from './sst'
+import { atualizarTransmissao } from './09_sst'
 
 // ─── CONFIGURAÇÃO ────────────────────────────────────────
 const ESOCIAL_URL = {

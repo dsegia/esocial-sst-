@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           plano_expira_em: null,
           stripe_subscription_id: null,
           stripe_metered_item_id: null,
-          max_funcionarios: 999999,
+          max_funcionarios: 0,
           creditos_restantes: 0,
           creditos_incluidos: 0,
         })

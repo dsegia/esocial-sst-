@@ -11,20 +11,37 @@ export type Database = {
           resp_tecnico: string | null
           resp_conselho: string | null
           resp_registro: string | null
+          resp_nome: string | null
+          resp_cpf: string | null
+          resp_cargo: string | null
           tipo_acesso: 'propria' | 'terceiro'
           ativo: boolean
+          bloqueado: boolean | null
           criado_em: string
           atualizado_em: string
-          // Plano / SaaS
-          plano: 'trial' | 'starter' | 'pro' | 'business' | 'enterprise' | 'cancelado'
+          endereco: string | null
+          municipio: string | null
+          uf: string | null
+          cep: string | null
+          plano: 'trial' | 'micro' | 'starter' | 'pro' | 'professional' | 'business' | 'enterprise' | 'cancelado'
           plano_expira_em: string | null
           trial_inicio: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          stripe_metered_item_id: string | null
           max_funcionarios: number
+          creditos_restantes: number
+          creditos_incluidos: number
+          cert_digital_validade: string | null
+          cert_tipo: string | null
+          cert_titular: string | null
+          cert_configurado_em: string | null
+          ecac_cnpj_procurador: string | null
+          ecac_nome_procurador: string | null
         }
         Insert: Omit<Database['public']['Tables']['empresas']['Row'], 'id' | 'criado_em' | 'atualizado_em'>
         Update: Partial<Database['public']['Tables']['empresas']['Insert']>
+        Relationships: []
       }
       funcionarios: {
         Row: {
@@ -32,11 +49,12 @@ export type Database = {
           empresa_id: string
           nome: string
           cpf: string
-          data_nasc: string
-          data_adm: string
+          data_nasc: string | null
+          data_adm: string | null
           matricula_esocial: string
           funcao: string | null
           cbo: string | null
+          cod_cbo: string | null
           setor: string | null
           salario: number | null
           vinculo: string | null
@@ -46,6 +64,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['funcionarios']['Row'], 'id' | 'criado_em'>
         Update: Partial<Database['public']['Tables']['funcionarios']['Insert']>
+        Relationships: []
       }
       asos: {
         Row: {
@@ -65,6 +84,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['asos']['Row'], 'id' | 'criado_em'>
         Update: Partial<Database['public']['Tables']['asos']['Insert']>
+        Relationships: []
       }
       ltcats: {
         Row: {
@@ -83,6 +103,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['ltcats']['Row'], 'id' | 'criado_em'>
         Update: Partial<Database['public']['Tables']['ltcats']['Insert']>
+        Relationships: []
       }
       cats: {
         Row: {
@@ -105,16 +126,17 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['cats']['Row'], 'id' | 'criado_em'>
         Update: Partial<Database['public']['Tables']['cats']['Insert']>
+        Relationships: []
       }
       transmissoes: {
         Row: {
           id: string
           empresa_id: string
           funcionario_id: string | null
-          evento: 'S-2210' | 'S-2220' | 'S-2240'
+          evento: 'S-2210' | 'S-2220' | 'S-2221' | 'S-2240'
           referencia_id: string | null
           referencia_tipo: 'aso' | 'cat' | 'ltcat' | null
-          status: 'pendente' | 'enviado' | 'rejeitado' | 'lote'
+          status: 'pendente' | 'enviado' | 'rejeitado' | 'lote' | 'cancelado'
           recibo: string | null
           xml_path: string | null
           resposta_govbr: Record<string, unknown> | null
@@ -128,17 +150,79 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['transmissoes']['Row'], 'id' | 'criado_em'>
         Update: Partial<Database['public']['Tables']['transmissoes']['Insert']>
+        Relationships: []
       }
       usuarios: {
         Row: {
           id: string
           empresa_id: string
           nome: string
+          email: string | null
           perfil: 'admin' | 'operador' | 'visualizador'
           criado_em: string
         }
         Insert: Omit<Database['public']['Tables']['usuarios']['Row'], 'criado_em'>
         Update: Partial<Database['public']['Tables']['usuarios']['Insert']>
+        Relationships: []
+      }
+      usuario_empresas: {
+        Row: {
+          usuario_id: string
+          empresa_id: string
+          perfil: 'admin' | 'operador' | 'visualizador'
+          criado_em: string
+        }
+        Insert: Omit<Database['public']['Tables']['usuario_empresas']['Row'], 'criado_em'>
+        Update: Partial<Database['public']['Tables']['usuario_empresas']['Insert']>
+        Relationships: []
+      }
+      pcmso_programa: {
+        Row: {
+          id: string
+          empresa_id: string
+          funcao: string | null
+          atualizado_em: string
+          criado_em: string
+        }
+        Insert: Omit<Database['public']['Tables']['pcmso_programa']['Row'], 'id' | 'criado_em'>
+        Update: Partial<Database['public']['Tables']['pcmso_programa']['Insert']>
+        Relationships: []
+      }
+    }
+    Views: { [_ in never]: never }
+    Functions: {
+      consumir_credito: {
+        Args: { p_empresa_id: string }
+        Returns: boolean
+      }
+      get_plano_empresa: {
+        Args: { p_empresa_id: string }
+        Returns: {
+          plano: string
+          plano_expira_em: string | null
+          trial_ativo: boolean
+          trial_dias_restantes: number
+          max_funcionarios: number
+          qtd_funcionarios: number
+          pode_adicionar: boolean
+          tem_stripe: boolean
+        }
+      }
+      get_alertas_vencimento: {
+        Args: { p_empresa_id: string }
+        Returns: Array<{
+          funcionario_id: string
+          nome: string
+          matricula: string
+          setor: string
+          tipo_alerta: string
+          data_venc: string
+          dias_restantes: number
+        }>
+      }
+      verificar_duplicidade: {
+        Args: { p_empresa_id: string; p_funcionario_id: string; p_evento: string }
+        Returns: boolean
       }
     }
   }

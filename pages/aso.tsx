@@ -7,8 +7,8 @@ import { getEmpresaId } from '../lib/empresa'
 import { gerarPdfAso } from '../lib/gerar-pdf'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const TIPO_LABEL: Record<string,string> = {

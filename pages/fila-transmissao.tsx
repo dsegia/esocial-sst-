@@ -6,8 +6,8 @@ import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 type Tx = {
@@ -59,8 +59,8 @@ export default function FilaTransmissao() {
         .eq('status', 'rejeitado')
         .order('criado_em', { ascending: false }),
     ])
-    setPendentes((pendRes.data || []) as Tx[])
-    setRejeitados((rejRes.data || []) as Tx[])
+    setPendentes((pendRes.data || []) as unknown as Tx[])
+    setRejeitados((rejRes.data || []) as unknown as Tx[])
   }
 
   function diasAtraso(dataStr: string) {

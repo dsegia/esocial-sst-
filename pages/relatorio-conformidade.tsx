@@ -7,8 +7,8 @@ import { getEmpresaId } from '../lib/empresa'
 import { pdfConformidadeASO } from '../lib/gerarPDF'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 type Funcionario = {

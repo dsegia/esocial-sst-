@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -6,15 +6,21 @@ import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+interface CertInfo {
+  validade: string
+  tipo: string
+  titular: string
+}
 
 export default function Configuracoes() {
   const router = useRouter()
-  const inputCertRef = useRef()
+  const inputCertRef = useRef<HTMLInputElement>(null)
   const [empresaId, setEmpresaId] = useState('')
-  const [empresa, setEmpresa] = useState(null)
+  const [empresa, setEmpresa] = useState<any>(null)
   const [aba, setAba] = useState('certificado')
 
   // Usuários
@@ -33,9 +39,9 @@ export default function Configuracoes() {
   const [erro, setErro] = useState('')
 
   // Certificado A1
-  const [certArquivo, setCertArquivo] = useState(null)
+  const [certArquivo, setCertArquivo] = useState<File | null>(null)
   const [certSenha, setCertSenha] = useState('')
-  const [certInfo, setCertInfo] = useState(null)
+  const [certInfo, setCertInfo] = useState<CertInfo | null>(null)
   const [lendoCert, setLendoCert] = useState(false)
 
   // eCAC
@@ -88,15 +94,15 @@ export default function Configuracoes() {
     setCarregando(false)
   }
 
-  async function lerCertificado(file) {
+  async function lerCertificado(file: File | null) {
     if (!file) return
     setLendoCert(true); setCertInfo(null); setErro('')
     setCertArquivo(file)
     // Lê metadados básicos do .pfx via API
     try {
-      const base64 = await new Promise(resolve => {
+      const base64 = await new Promise<string>(resolve => {
         const reader = new FileReader()
-        reader.onload = e => resolve(e.target.result.split(',')[1])
+        reader.onload = (e: ProgressEvent<FileReader>) => resolve((e.target!.result as string).split(',')[1])
         reader.readAsDataURL(file)
       })
       const resp = await fetch('/api/ler-certificado', {
@@ -111,7 +117,7 @@ export default function Configuracoes() {
       } else {
         setErro(data.erro || 'Erro ao ler certificado. Verifique o arquivo e a senha.')
       }
-    } catch (err) {
+    } catch (err: any) {
       setErro('Erro ao processar certificado: ' + err.message)
     }
     setLendoCert(false)
@@ -130,7 +136,7 @@ export default function Configuracoes() {
       }).eq('id', empresaId)
       if (error) throw error
       setSucesso('Certificado configurado com sucesso!')
-    } catch (err) {
+    } catch (err: any) {
       setErro('Erro ao salvar: ' + err.message)
     }
     setSalvando(false)
@@ -204,7 +210,7 @@ export default function Configuracoes() {
     setSalvando(false)
   }
 
-  const certVencendo = certInfo?.validade && Math.round((new Date(certInfo.validade) - new Date()) / 86400000)
+  const certVencendo = certInfo?.validade ? Math.round((new Date(certInfo.validade).getTime() - Date.now()) / 86400000) : 999
 
   if (carregando) return <div style={s.loading}>Carregando...</div>
 
@@ -284,13 +290,13 @@ export default function Configuracoes() {
             <div>
               <label style={s.label}>Arquivo do certificado (.pfx ou .p12) *</label>
               <div style={{ border:'2px dashed #d1d5db', borderRadius:8, padding:'16px', textAlign:'center', cursor:'pointer', marginBottom:8 }}
-                onClick={() => inputCertRef.current.click()}>
+                onClick={() => inputCertRef.current?.click()}>
                 {certArquivo
                   ? <div style={{ fontSize:13, color:'#185FA5' }}>✓ {certArquivo.name}</div>
                   : <div style={{ fontSize:13, color:'#9ca3af' }}>Clique para selecionar o arquivo</div>}
               </div>
               <input ref={inputCertRef} type="file" accept=".pfx,.p12" style={{ display:'none' }}
-                onChange={e => setCertArquivo(e.target.files[0])} />
+                onChange={e => setCertArquivo(e.target.files?.[0] ?? null)} />
             </div>
             <div>
               <label style={s.label}>Senha do certificado *</label>
@@ -541,7 +547,7 @@ export default function Configuracoes() {
   )
 }
 
-const s = {
+const s: Record<string, CSSProperties> = {
   loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
   header:     { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem' },
   titulo:     { fontSize:20, fontWeight:700, color:'#111' },

@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 import { setEmpresaId, setMultiEmpresa } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 type Empresa = { id: string; razao_social: string; cnpj: string; perfil?: string }

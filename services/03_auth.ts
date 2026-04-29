@@ -61,12 +61,8 @@ export async function cadastrarEmpresa(dados: {
   // 2. Cria a empresa
   const { data: empresa, error: empErr } = await supabase
     .from('empresas')
-    .insert({
-      cnpj: dados.cnpj,
-      razao_social: dados.razao_social,
-      cnae: dados.cnae,
-      grau_risco: dados.grau_risco,
-    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert({ cnpj: dados.cnpj, razao_social: dados.razao_social, cnae: dados.cnae, grau_risco: dados.grau_risco } as any)
     .select()
     .single()
 
@@ -75,12 +71,8 @@ export async function cadastrarEmpresa(dados: {
   // 3. Cria o usuário admin vinculado à empresa
   const { error: uErr } = await supabase
     .from('usuarios')
-    .insert({
-      id: authData.user.id,
-      empresa_id: empresa.id,
-      nome: dados.nome_usuario,
-      perfil: 'admin',
-    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert({ id: authData.user.id, empresa_id: (empresa as any).id, nome: dados.nome_usuario, perfil: 'admin' } as any)
 
   if (uErr) throw new Error('Erro ao vincular usuário à empresa.')
   return empresa

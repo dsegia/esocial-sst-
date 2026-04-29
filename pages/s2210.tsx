@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -6,8 +6,8 @@ import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const TIPOS_CAT = [
@@ -21,14 +21,14 @@ const TIPO_LBL = { tipico: 'Acidente típico', trajeto: 'Acidente de trajeto', d
 export default function S2210() {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState('')
-  const [funcionarios, setFuncionarios] = useState([])
-  const [funcSel, setFuncSel] = useState(null)
+  const [funcionarios, setFuncionarios] = useState<any[]>([])
+  const [funcSel, setFuncSel] = useState<any>(null)
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
   const [tipoCat, setTipoCat] = useState('')
-  const [cats, setCats] = useState([])
+  const [cats, setCats] = useState<any[]>([])
   const [abaAtiva, setAbaAtiva] = useState<'lista'|'novo'>('lista')
   const [form, setForm] = useState({
     funcionario_id: '',
@@ -73,12 +73,12 @@ export default function S2210() {
     setCats(data || [])
   }
 
-  function selecionarFunc(id) {
+  function selecionarFunc(id: string) {
     setForm(f => ({ ...f, funcionario_id: id }))
     setFuncSel(funcionarios.find(x => x.id === id) || null)
   }
 
-  async function salvar(e) {
+  async function salvar(e: FormEvent) {
     e.preventDefault(); setErro(''); setSucesso(''); setSalvando(true)
     if (!tipoCat) { setErro('Selecione o tipo de CAT.'); setSalvando(false); return }
     if (!form.funcionario_id) { setErro('Selecione o funcionário.'); setSalvando(false); return }
@@ -123,9 +123,9 @@ export default function S2210() {
     carregarCats(empresaId)
   }
 
-  const inp = { width:'100%', padding:'8px 10px', fontSize:13, border:'1px solid #d1d5db', borderRadius:8, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' }
-  const lbl = { display:'block', fontSize:12, fontWeight:500, color:'#374151', marginBottom:4 }
-  const card = { background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, padding:'1.25rem', marginBottom:'1rem' }
+  const inp: CSSProperties = { width:'100%', padding:'8px 10px', fontSize:13, border:'1px solid #d1d5db', borderRadius:8, background:'#fff', color:'#111', boxSizing:'border-box', fontFamily:'inherit' }
+  const lbl: CSSProperties = { display:'block', fontSize:12, fontWeight:500, color:'#374151', marginBottom:4 }
+  const card: CSSProperties = { background:'#fff', border:'0.5px solid #e5e7eb', borderRadius:12, padding:'1.25rem', marginBottom:'1rem' }
 
   if (carregando) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' }}>Carregando...</div>
 
@@ -255,7 +255,7 @@ export default function S2210() {
           {funcSel && (
             <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'#FCEBEB', borderRadius:8 }}>
               <div style={{ width:32, height:32, borderRadius:'50%', background:'#E24B4A', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700 }}>
-                {funcSel.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase()}
+                {funcSel.nome.split(' ').map((p: string)=>p[0]).slice(0,2).join('').toUpperCase()}
               </div>
               <div>
                 <div style={{ fontSize:13, fontWeight:600, color:'#111' }}>{funcSel.nome}</div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -53,27 +53,27 @@ function codigoDeExame(nome: string): string {
 }
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 export default function S2240() {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState('')
-  const [funcionarios, setFuncionarios] = useState([])
-  const [ltcatAtivo, setLtcatAtivo] = useState(null)
-  const [transmissoes, setTransmissoes] = useState([])
+  const [funcionarios, setFuncionarios] = useState<any[]>([])
+  const [ltcatAtivo, setLtcatAtivo] = useState<any>(null)
+  const [transmissoes, setTransmissoes] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState('todos')
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
   // Mapear GHE
-  const [mapeandoFunc, setMapeandoFunc] = useState(null)
+  const [mapeandoFunc, setMapeandoFunc] = useState<any>(null)
   // Editar funcionário
-  const [editandoFunc, setEditandoFunc] = useState(null)
-  const [confirmExcluirTx, setConfirmExcluirTx] = useState(null)
-  const [confirmExcluirFunc, setConfirmExcluirFunc] = useState(null)
-  const [formEdit, setFormEdit] = useState({})
+  const [editandoFunc, setEditandoFunc] = useState<any>(null)
+  const [confirmExcluirTx, setConfirmExcluirTx] = useState<any>(null)
+  const [confirmExcluirFunc, setConfirmExcluirFunc] = useState<any>(null)
+  const [formEdit, setFormEdit] = useState<Record<string, string>>({})
   const [salvandoEdit, setSalvandoEdit] = useState(false)
   const [gheSelecionado, setGheSelecionado] = useState('')
   // Exames no modal de edição
@@ -109,11 +109,11 @@ export default function S2240() {
     setCarregando(false)
   }
 
-  function ultimaTx(funcId) {
+  function ultimaTx(funcId: string) {
     return transmissoes.filter(t => t.funcionario_id === funcId)[0] || null
   }
 
-  function ultimoAsoFunc(funcId) {
+  function ultimoAsoFunc(funcId: string) {
     return asos.filter(a => a.funcionario_id === funcId)
       .sort((a, b) => new Date(b.data_exame).getTime() - new Date(a.data_exame).getTime())[0] || null
   }
@@ -157,7 +157,7 @@ export default function S2240() {
     setFormExames(prev => prev.map((e, i) => i === idx ? { ...e, resultado } : e))
   }
 
-  function gheDoFuncionario(func) {
+  function gheDoFuncionario(func: any) {
     if (!ltcatAtivo?.ghes) return null
 
     // 1. GHE fixado manualmente (ghe_id salvo no funcionário)
@@ -169,12 +169,12 @@ export default function S2240() {
     if (func.funcao) {
       const fnLow = func.funcao.toLowerCase().trim()
       for (const ghe of ltcatAtivo.ghes) {
-        const fnsGhe = (ghe.funcoes || []).map(f => f.toLowerCase().trim())
+        const fnsGhe = (ghe.funcoes || []).map((f: any) => f.toLowerCase().trim())
         // Verifica correspondência parcial em ambas as direções
-        if (fnsGhe.some(f =>
+        if (fnsGhe.some((f: any) =>
           f.includes(fnLow) || fnLow.includes(f) ||
           // Verifica palavras principais (ignora preposições)
-          fnLow.split(' ').filter(w=>w.length>3).some(w => f.includes(w))
+          fnLow.split(' ').filter((w: any) => w.length>3).some((w: any) => f.includes(w))
         )) return ghe
       }
     }
@@ -195,13 +195,13 @@ export default function S2240() {
   }
 
   // Índice do GHE para o funcionário (para salvar no banco)
-  function idxGheDoFuncionario(func) {
+  function idxGheDoFuncionario(func: any) {
     const ghe = gheDoFuncionario(func)
     if (!ghe || !ltcatAtivo?.ghes) return null
     return ltcatAtivo.ghes.indexOf(ghe)
   }
 
-  function statusFuncionario(func) {
+  function statusFuncionario(func: any) {
     const tx  = ultimaTx(func.id)
     const ghe = gheDoFuncionario(func)
     const aso = ultimoAsoFunc(func.id)
@@ -224,7 +224,7 @@ export default function S2240() {
     return { label:'Em dia', cor:'#1D9E75', bg:'#EAF3DE', pode:false, motivo:'' }
   }
 
-  async function vincularGHE(func) {
+  async function vincularGHE(func: any) {
     if (gheSelecionado === '') { setErro('Selecione um GHE.'); return }
     const idx = parseInt(gheSelecionado)
     const { error } = await supabase.from('funcionarios').update({ ghe_id: idx }).eq('id', func.id)
@@ -273,7 +273,7 @@ export default function S2240() {
     setSalvandoEdit(false)
   }
 
-  async function excluirFuncionario(funcId) {
+  async function excluirFuncionario(funcId: string) {
     const { error } = await supabase.from('funcionarios').delete().eq('id', funcId)
     if (error) { setErro('Erro: ' + error.message); return }
     setSucesso('Funcionário excluído permanentemente.')
@@ -281,7 +281,7 @@ export default function S2240() {
     init()
   }
 
-  async function excluirTransmissao(txId) {
+  async function excluirTransmissao(txId: string) {
     const { error } = await supabase.from('transmissoes').delete().eq('id', txId)
     if (error) { setErro('Erro ao excluir: ' + error.message); return }
     setSucesso('Transmissão excluída.')
@@ -400,7 +400,7 @@ export default function S2240() {
             <label style={s.label}>GHE do LTCAT</label>
             <select style={{ ...s.input, marginBottom:14 }} value={gheSelecionado} onChange={e => setGheSelecionado(e.target.value)}>
               <option value="">— selecione —</option>
-              {(ltcatAtivo?.ghes||[]).map((g,i) => (
+              {(ltcatAtivo?.ghes||[]).map((g: any, i: number) => (
                 <option key={i} value={i}>
                   {g.nome||`GHE ${i+1}`}
                   {g.setor ? ` — ${g.setor}` : ''}
@@ -421,14 +421,14 @@ export default function S2240() {
                   <div style={{ marginBottom:6 }}>
                     <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase', marginBottom:3 }}>Funções cadastradas</div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                      {ltcatAtivo.ghes[parseInt(gheSelecionado)].funcoes.map((fn,i) => (
+                      {ltcatAtivo.ghes[parseInt(gheSelecionado)].funcoes.map((fn: any, i: number) => (
                         <span key={i} style={{ padding:'1px 7px', borderRadius:99, fontSize:11, background:'#E6F1FB', color:'#0C447C' }}>{fn}</span>
                       ))}
                     </div>
                   </div>
                 )}
                 <div style={{ color:'#6b7280', marginBottom:4 }}>
-                  <strong>Agentes:</strong> {(ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes||[]).slice(0,3).map(a=>a.nome).join(', ')}
+                  <strong>Agentes:</strong> {(ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes||[]).slice(0,3).map((a: any)=>a.nome).join(', ')}
                   {(ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes||[]).length > 3 && ` +${ltcatAtivo.ghes[parseInt(gheSelecionado)].agentes.length-3}`}
                 </div>
                 {ltcatAtivo.ghes[parseInt(gheSelecionado)].aposentadoria_especial && (
@@ -842,7 +842,7 @@ export default function S2240() {
   )
 }
 
-const s = {
+const s: Record<string, CSSProperties> = {
   loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
   header:     { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1.25rem' },
   titulo:     { fontSize:18, fontWeight:700, color:'#111' },

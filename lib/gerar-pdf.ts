@@ -287,7 +287,8 @@ export async function gerarPdfLtcat(dados: any, empresa: any): Promise<void> {
       doc.setFontSize(7); doc.setTextColor(100); doc.text('AGENTES DE RISCO', mg, y); y += 4
       for (const ag of ghe.agentes) {
         if (y > 265) { doc.addPage(); y = 20 }
-        const tipo = { fis: 'Físico', qui: 'Químico', bio: 'Biológico', erg: 'Ergonômico' }[ag.tipo] || ag.tipo || ''
+        const tipoMap: Record<string, string> = { fis: 'Físico', qui: 'Químico', bio: 'Biológico', erg: 'Ergonômico' }
+        const tipo = tipoMap[ag.tipo] || ag.tipo || ''
         doc.setFontSize(9); doc.setTextColor(30)
         doc.text(`• [${tipo}] ${ag.nome}${ag.valor ? ` — ${ag.valor}` : ''}`, mg + 2, y)
         y += 4.5

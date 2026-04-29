@@ -1,8 +1,8 @@
-import { gerarXML_S2220, gerarXML_S2240, gerarXML_S2210, validarDadosS2220, validarDadosS2210 } from './xml-generator'
-import { assinarEvento } from './assinar'
-import { uploadXML } from './storage'
-import { enviarLote, type AmbienteESocial } from './govbr'
-import { salvarTransmissao, atualizarTransmissao } from './sst'
+import { gerarXML_S2220, gerarXML_S2240, gerarXML_S2210, validarDadosS2220, validarDadosS2210 } from './06_xml-generator'
+import { assinarEvento } from './07_assinar'
+import { uploadXML } from './05_storage'
+import { enviarLote, type AmbienteESocial } from './08_govbr'
+import { salvarTransmissao, atualizarTransmissao } from './09_sst'
 import type { ASO, LTCAT, CAT, Funcionario, Empresa } from '../types/database'
 
 export type ResultadoTransmissao = {

@@ -62,7 +62,8 @@ export async function criarFuncionario(
 
   const { data, error } = await supabase
     .from('funcionarios')
-    .insert({ ...dados, empresa_id: empresaId })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert({ ...dados, empresa_id: empresaId } as any)
     .select()
     .single()
 
@@ -74,7 +75,8 @@ export async function criarFuncionario(
 export async function atualizarFuncionario(id: string, dados: Partial<Funcionario>) {
   const { data, error } = await supabase
     .from('funcionarios')
-    .update(dados)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(dados as any)
     .eq('id', id)
     .select()
     .single()
@@ -121,6 +123,7 @@ export async function importarFuncionarios(
 
       if (!existente) {
         // NOVO
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await supabase.from('funcionarios').insert({
           empresa_id: empresaId,
           nome: linha.nome!,
@@ -133,7 +136,7 @@ export async function importarFuncionarios(
           salario: linha.salario,
           vinculo: linha.vinculo || 'CLT',
           turno: linha.turno || 'Diurno',
-        })
+        } as any)
         resultado.novos++
       } else {
         // Verifica se há diferença

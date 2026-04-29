@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -6,23 +6,23 @@ import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const EVT_COR = { 'S-2210':['#FCEBEB','#791F1F'], 'S-2220':['#E6F1FB','#0C447C'], 'S-2240':['#FAEEDA','#633806'] }
-const ST_COR  = { enviado:['#EAF3DE','#27500A'], pendente:['#FAEEDA','#633806'], rejeitado:['#FCEBEB','#791F1F'], cancelado:['#f3f4f6','#6b7280'] }
-const ST_LBL  = { enviado:'Enviado', pendente:'Pendente', rejeitado:'Rejeitado', cancelado:'Cancelado' }
+const EVT_COR: Record<string, string[]> = { 'S-2210':['#FCEBEB','#791F1F'], 'S-2220':['#E6F1FB','#0C447C'], 'S-2240':['#FAEEDA','#633806'] }
+const ST_COR: Record<string, string[]>  = { enviado:['#EAF3DE','#27500A'], pendente:['#FAEEDA','#633806'], rejeitado:['#FCEBEB','#791F1F'], cancelado:['#f3f4f6','#6b7280'] }
+const ST_LBL: Record<string, string>    = { enviado:'Enviado', pendente:'Pendente', rejeitado:'Rejeitado', cancelado:'Cancelado' }
 
 export default function Historico() {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState('')
-  const [lista, setLista] = useState([])
-  const [selecionados, setSelecionados] = useState([])
+  const [lista, setLista] = useState<any[]>([])
+  const [selecionados, setSelecionados] = useState<any[]>([])
   const [filtroEvt, setFiltroEvt] = useState('')
   const [filtroSt, setFiltroSt] = useState('')
   const [carregando, setCarregando] = useState(true)
-  const [confirmExcluir, setConfirmExcluir] = useState(null)
+  const [confirmExcluir, setConfirmExcluir] = useState<any>(null)
   const [modoSelecao, setModoSelecao] = useState(false)
   const [sucesso, setSucesso] = useState('')
   const [erro, setErro] = useState('')
@@ -48,7 +48,7 @@ export default function Historico() {
     setCarregando(false)
   }
 
-  async function carregar(eId, evt, st) {
+  async function carregar(eId: string, evt: string, st: string) {
     let q = supabase.from('transmissoes')
       .select('id, evento, status, dt_envio, recibo, tentativas, criado_em, funcionario_id, funcionarios(nome, matricula_esocial)')
       .eq('empresa_id', eId)
@@ -61,7 +61,7 @@ export default function Historico() {
     setSelecionados([])
   }
 
-  async function excluir(id) {
+  async function excluir(id: string) {
     setErro(''); setSucesso('')
     const { error } = await supabase.from('transmissoes').delete().eq('id', id)
     if (error) { setErro('Erro ao excluir: ' + error.message); return }
@@ -93,7 +93,7 @@ export default function Historico() {
 
   const pendentes = lista.filter(t => t.status === 'pendente')
 
-  function toggleSel(id) {
+  function toggleSel(id: string) {
     setSelecionados(p => p.includes(id) ? p.filter(x=>x!==id) : [...p,id])
   }
   function toggleTodos() {
@@ -102,7 +102,7 @@ export default function Historico() {
     else setSelecionados(selPendentes)
   }
 
-  function fmtData(d) {
+  function fmtData(d: string | null | undefined) {
     if (!d) return '—'
     return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
   }
@@ -302,7 +302,7 @@ export default function Historico() {
   )
 }
 
-const s = {
+const s: Record<string, CSSProperties> = {
   loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
   header:     { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem' },
   titulo:     { fontSize:20, fontWeight:700, color:'#111' },

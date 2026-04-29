@@ -1,40 +1,40 @@
 // pages/transmissao-manual.tsx
 // Tela para transmitir eventos ao Gov.br com certificado digital A1
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const ETAPAS = ['certificado', 'selecionar', 'assinar', 'transmitir', 'resultado']
 
 export default function TransmissaoManual() {
   const router = useRouter()
-  const certRef = useRef()
-  const [empresa, setEmpresa] = useState(null)
+  const certRef = useRef<HTMLInputElement>(null)
+  const [empresa, setEmpresa] = useState<any>(null)
   const [empresaId, setEmpresaId] = useState('')
-  const [etapa, setEtapa] = useState('certificado')
-  const [pendentes, setPendentes] = useState([])
-  const [selecionados, setSelecionados] = useState([])
+  const [etapa, setEtapa] = useState<'certificado'|'selecionar'|'assinar'|'transmitir'|'resultado'>('certificado')
+  const [pendentes, setPendentes] = useState<any[]>([])
+  const [selecionados, setSelecionados] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState(false)
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState('')
-  const [resultados, setResultados] = useState([])
+  const [resultados, setResultados] = useState<any[]>([])
   const [ambiente, setAmbiente] = useState('producao_restrita')
   const [testando, setTestando] = useState(false)
   const [testeResult, setTesteResult] = useState<null | { ok: boolean; msg: string; latencia?: number }>(null)
 
   // Certificado (nunca sai do estado do browser)
-  const [certArquivo, setCertArquivo] = useState(null)
+  const [certArquivo, setCertArquivo] = useState<any>(null)
   const [certSenha, setCertSenha] = useState('')
-  const [certInfo, setCertInfo] = useState(null)
+  const [certInfo, setCertInfo] = useState<any>(null)
   const [pfxBase64, setPfxBase64] = useState('')
   const [sessionToken, setSessionToken] = useState('')
 
@@ -85,10 +85,10 @@ export default function TransmissaoManual() {
     try {
       const base64 = await new Promise(resolve => {
         const r = new FileReader()
-        r.onload = e => resolve(e.target.result.split(',')[1])
+        r.onload = (e) => resolve((e.target?.result as string | null)?.split(',')[1] ?? null)
         r.readAsDataURL(certArquivo)
       })
-      setPfxBase64(base64)
+      setPfxBase64(base64 as string)
 
       const resp = await fetch('/api/ler-certificado', {
         method: 'POST',
@@ -101,7 +101,7 @@ export default function TransmissaoManual() {
       setSucesso('Certificado lido com sucesso! Prossiga para selecionar os eventos.')
       setEtapa('selecionar')
     } catch (err) {
-      setErro(err.message)
+      setErro(err instanceof Error ? err.message : 'Erro desconhecido')
     }
     setProcessando(false)
   }
@@ -189,7 +189,7 @@ export default function TransmissaoManual() {
         setEtapa('assinar')
 
         // 3. Assinar XML
-        const TAG_MAP = { 'S-2220':'evtMonit', 'S-2240':'evtExpRisco', 'S-2210':'evtCAT' }
+        const TAG_MAP: Record<string, string> = { 'S-2220':'evtMonit', 'S-2240':'evtExpRisco', 'S-2210':'evtCAT' }
         const assinarResp = await fetch('/api/assinar-xml', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeader },
@@ -263,7 +263,7 @@ export default function TransmissaoManual() {
           evento: tx?.evento,
           funcionario: tx?.funcionarios?.nome,
           sucesso: false,
-          descricao: err.message,
+          descricao: err instanceof Error ? err.message : String(err),
         })
       }
     }
@@ -338,13 +338,13 @@ export default function TransmissaoManual() {
             <div>
               <label style={s.label}>Arquivo do certificado (.pfx)</label>
               <div style={{ border:'2px dashed #d1d5db', borderRadius:8, padding:14, textAlign:'center', cursor:'pointer' }}
-                onClick={() => certRef.current.click()}>
+                onClick={() => certRef.current?.click()}>
                 {certArquivo
                   ? <div style={{ color:'#185FA5', fontSize:13, fontWeight:500 }}>✓ {certArquivo.name}</div>
                   : <div style={{ color:'#9ca3af', fontSize:13 }}>Clique para selecionar</div>}
               </div>
               <input ref={certRef} type="file" accept=".pfx,.p12" style={{ display:'none' }}
-                onChange={e => setCertArquivo(e.target.files[0])} />
+                onChange={e => setCertArquivo(e.target.files?.[0] ?? null)} />
             </div>
             <div>
               <label style={s.label}>Senha do certificado</label>
@@ -383,8 +383,8 @@ export default function TransmissaoManual() {
               </div>
               {pendentes.map(tx => {
                 const sel = selecionados.includes(tx.id)
-                const EVT_BG = { 'S-2210':'#FCEBEB', 'S-2220':'#E6F1FB', 'S-2240':'#FAEEDA' }
-                const EVT_COR = { 'S-2210':'#791F1F', 'S-2220':'#0C447C', 'S-2240':'#633806' }
+                const EVT_BG: Record<string, string> = { 'S-2210':'#FCEBEB', 'S-2220':'#E6F1FB', 'S-2240':'#FAEEDA' }
+                const EVT_COR: Record<string, string> = { 'S-2210':'#791F1F', 'S-2220':'#0C447C', 'S-2240':'#633806' }
                 return (
                   <div key={tx.id} onClick={() => setSelecionados(p => p.includes(tx.id) ? p.filter(x=>x!==tx.id) : [...p,tx.id])}
                     style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderRadius:8,
@@ -410,7 +410,7 @@ export default function TransmissaoManual() {
                   <button style={{ ...s.btnPrimary, fontSize:14 }}
                     onClick={transmitirSelecionados} disabled={processando}>
                     {processando
-                      ? etapa === 'assinar' ? '✍ Assinando XMLs...' : '📡 Transmitindo ao Gov.br...'
+                      ? (etapa as string) === 'assinar' ? '✍ Assinando XMLs...' : '📡 Transmitindo ao Gov.br...'
                       : `Assinar e transmitir ${selecionados.length} evento(s) →`}
                   </button>
                 </div>
@@ -447,7 +447,7 @@ export default function TransmissaoManual() {
                 {r.recibo && <span style={{ fontSize:11, fontFamily:'monospace', color:'#27500A' }}>Recibo: {r.recibo}</span>}
               </div>
               {r.descricao && <div style={{ fontSize:12, marginTop:4, color: r.sucesso?'#085041':'#791F1F' }}>{r.descricao}</div>}
-              {r.ocorrencias?.map((oc,j) => (
+              {r.ocorrencias?.map((oc: any, j: number) => (
                 <div key={j} style={{ fontSize:11, color:'#791F1F', marginTop:2 }}>• {oc}</div>
               ))}
             </div>
@@ -467,7 +467,7 @@ export default function TransmissaoManual() {
   )
 }
 
-const s = {
+const s: Record<string, CSSProperties> = {
   loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
   header:     { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1.25rem' },
   titulo:     { fontSize:20, fontWeight:700, color:'#111' },

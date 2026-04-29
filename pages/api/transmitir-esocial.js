@@ -47,14 +47,18 @@ export default async function handler(req, res) {
   }
 
   if (empresa.creditos_restantes > 0) {
-    // Consome 1 crédito incluído
-    await sbAdmin.from('empresas')
-      .update({ creditos_restantes: empresa.creditos_restantes - 1 })
-      .eq('id', empresaId)
+    // Dedução atômica — evita race condition com requisições simultâneas
+    const { data: deduziu } = await sbAdmin.rpc('consumir_credito', { p_empresa_id: empresaId })
+    if (!deduziu) {
+      return res.status(402).json({
+        erro: 'Créditos de envio esgotados. Acesse Planos para adquirir um plano com mais envios.',
+        sem_creditos: true,
+      })
+    }
   } else if (empresa.stripe_customer_id && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_METER_ENVIOS) {
     // Créditos esgotados — registra evento no meter do Stripe (cobrado no fechamento do ciclo)
     try {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-03-31.basil' })
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
       await stripe.billing.meterEvents.create({
         event_name: 'esocial_envio',
         payload: {
@@ -77,6 +81,12 @@ export default async function handler(req, res) {
 
   if (!xml_assinado || !cnpj_empregador) {
     return res.status(400).json({ erro: 'XML assinado e CNPJ são obrigatórios' })
+  }
+
+  // Evita XML injection que quebraria a estrutura do envelope SOAP
+  const tagsBloqueadas = ['</loteEventos>', '</enviarLoteEventos>', '</soapenv:Body>', '</soapenv:Envelope>']
+  if (tagsBloqueadas.some(tag => xml_assinado.includes(tag))) {
+    return res.status(400).json({ erro: 'XML inválido.' })
   }
 
   const endpoint = ENDPOINTS[ambiente]

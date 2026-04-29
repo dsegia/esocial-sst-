@@ -6,17 +6,17 @@ import Layout from '../components/Layout'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 export default function Dashboard() {
   const router = useRouter()
-  const [usuario, setUsuario] = useState(null)
-  const [empresa, setEmpresa] = useState(null)
-  const [kpis, setKpis] = useState(null)
-  const [alertas, setAlertas] = useState([])
-  const [ultimasTx, setUltimasTx] = useState([])
+  const [usuario, setUsuario] = useState<any>(null)
+  const [empresa, setEmpresa] = useState<any>(null)
+  const [kpis, setKpis] = useState<any>(null)
+  const [alertas, setAlertas] = useState<any[]>([])
+  const [ultimasTx, setUltimasTx] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => { init() }, [])
@@ -38,7 +38,7 @@ export default function Dashboard() {
     setCarregando(false)
   }
 
-  async function carregarDados(empresaId) {
+  async function carregarDados(empresaId: string) {
     const hoje = new Date()
     const em30 = new Date(hoje); em30.setDate(em30.getDate() + 30)
     const em60 = new Date(hoje); em60.setDate(em60.getDate() + 60)
@@ -47,7 +47,7 @@ export default function Dashboard() {
     const [funcsRes, asosRes, txRes, ltcatRes, catsRes, pcmsoRes] = await Promise.all([
       supabase.from('funcionarios').select('id, nome, cpf, data_adm, data_nasc, matricula_esocial, funcao, setor, ativo').eq('empresa_id', empresaId),
       supabase.from('asos').select('id, funcionario_id, tipo_aso, data_exame, prox_exame, conclusao').eq('empresa_id', empresaId).order('data_exame', { ascending: false }),
-      supabase.from('transmissoes').select('id, evento, status, criado_em, recibo, dt_envio, funcionarios(nome)').eq('empresa_id', empresaId).order('criado_em', { ascending: false }),
+      supabase.from('transmissoes').select('id, evento, status, criado_em, recibo, dt_envio, funcionario_id, funcionarios(nome)').eq('empresa_id', empresaId).order('criado_em', { ascending: false }),
       supabase.from('ltcats').select('id, data_emissao, prox_revisao, ativo, ghes').eq('empresa_id', empresaId).eq('ativo', true).limit(1).single(),
       supabase.from('cats').select('id, criado_em').eq('empresa_id', empresaId),
       supabase.from('pcmso_programa').select('id, funcao, atualizado_em').eq('empresa_id', empresaId).order('atualizado_em', { ascending: false }),
@@ -61,11 +61,11 @@ export default function Dashboard() {
     const pcmso    = pcmsoRes.data || []
 
     // Último ASO por funcionário
-    const ultimoAso = (funcId) => asos.filter(a => a.funcionario_id === funcId)
-      .sort((a,b) => new Date(b.data_exame) - new Date(a.data_exame))[0] || null
+    const ultimoAso = (funcId: string) => asos.filter((a: any) => a.funcionario_id === funcId)
+      .sort((a: any, b: any) => new Date(b.data_exame).getTime() - new Date(a.data_exame).getTime())[0] || null
 
     // Última TX por funcionário e evento
-    const ultimaTx = (funcId, evento) => txs.filter(t => t.funcionario_id === funcId && t.evento === evento)[0] || null
+    const ultimaTx = (funcId: string, evento: string) => txs.filter((t: any) => t.funcionario_id === funcId && t.evento === evento)[0] || null
 
     // Dados incompletos
     const incompletos = funcs.filter(f =>
@@ -73,11 +73,11 @@ export default function Dashboard() {
     )
 
     // ASOs vencidos e a vencer
-    const asoVencidos = []
-    const asoVence30  = []
-    const asoVence60  = []
-    const semAso      = []
-    const asoEmDia    = []
+    const asoVencidos: any[] = []
+    const asoVence30: any[]  = []
+    const asoVence60: any[]  = []
+    const semAso: any[]      = []
+    const asoEmDia: any[]    = []
 
     funcs.forEach(f => {
       const aso = ultimoAso(f.id)
@@ -182,9 +182,9 @@ export default function Dashboard() {
     })
   }
 
-  function diasParaVencer(d) {
+  function diasParaVencer(d: string | null | undefined) {
     if (!d) return null
-    return Math.round((new Date(d) - new Date()) / 86400000)
+    return Math.round((new Date(d).getTime() - Date.now()) / 86400000)
   }
 
   if (carregando) return (
@@ -201,8 +201,8 @@ export default function Dashboard() {
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
   const nomeUsuario = (usuario?.nome || 'usuário').split(' ')[0]
 
-  const EVT_COR = { 'S-2210':['#FCEBEB','#791F1F'], 'S-2220':['#E6F1FB','#0C447C'], 'S-2240':['#FAEEDA','#633806'] }
-  const ST_COR  = { enviado:['#EAF3DE','#27500A'], pendente:['#FAEEDA','#633806'], rejeitado:['#FCEBEB','#791F1F'] }
+  const EVT_COR: Record<string, string[]> = { 'S-2210':['#FCEBEB','#791F1F'], 'S-2220':['#E6F1FB','#0C447C'], 'S-2240':['#FAEEDA','#633806'] }
+  const ST_COR: Record<string, string[]>  = { enviado:['#EAF3DE','#27500A'], pendente:['#FAEEDA','#633806'], rejeitado:['#FCEBEB','#791F1F'] }
 
   return (
     <Layout pagina="dashboard">
@@ -287,9 +287,9 @@ export default function Dashboard() {
               Tudo em dia! Nenhuma pendência.
             </div>
           ) : alertas.map((al, i) => {
-            const BG  = { erro:'#FCEBEB', aviso:'#FAEEDA', info:'#EFF6FF' }
-            const COR = { erro:'#791F1F', aviso:'#633806', info:'#1e40af' }
-            const BR  = { erro:'#F09595', aviso:'#FAC775', info:'#93c5fd' }
+            const BG:  Record<string, string> = { erro:'#FCEBEB', aviso:'#FAEEDA', info:'#EFF6FF' }
+            const COR: Record<string, string> = { erro:'#791F1F', aviso:'#633806', info:'#1e40af' }
+            const BR:  Record<string, string> = { erro:'#F09595', aviso:'#FAC775', info:'#93c5fd' }
             return (
               <div key={i} style={{ display:'flex', gap:10, alignItems:'flex-start', padding:'9px 10px', borderRadius:8, background:BG[al.tipo], border:`0.5px solid ${BR[al.tipo]}`, marginBottom:6 }}>
                 <span style={{ fontSize:16, flexShrink:0, marginTop:1 }}>{al.icon}</span>

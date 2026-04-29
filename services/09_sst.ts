@@ -100,7 +100,8 @@ export async function salvarTransmissao(dados: Omit<Transmissao, 'id' | 'criado_
 export async function atualizarTransmissao(id: string, dados: Partial<Transmissao>) {
   const { data, error } = await supabase
     .from('transmissoes')
-    .update(dados)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(dados as any)
     .eq('id', id)
     .select()
     .single()
@@ -120,8 +121,10 @@ export async function listarTransmissoes(empresaId: string, filtros?: {
     .order('criado_em', { ascending: false })
     .limit(filtros?.limite || 100)
 
-  if (filtros?.evento) query = query.eq('evento', filtros.evento)
-  if (filtros?.status) query = query.eq('status', filtros.status)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (filtros?.evento) query = query.eq('evento', filtros.evento as any)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (filtros?.status) query = query.eq('status', filtros.status as any)
 
   const { data, error } = await query
   if (error) throw error

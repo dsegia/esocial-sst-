@@ -1,11 +1,11 @@
 import { useRouter } from 'next/router'
 import { createClient } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { getEmpresaId, isMultiEmpresa, limparEmpresa } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const MENU = [
@@ -31,7 +31,7 @@ const MENU = [
   { href:'/conta',           label:'Minha Conta',             icon:'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z' },
 ]
 
-export default function Layout({ children, pagina }) {
+export default function Layout({ children, pagina }: { children: ReactNode; pagina: string }) {
   const router = useRouter()
   const [nomeEmpresa, setNomeEmpresa] = useState('')
   const [nomeUser, setNomeUser] = useState('')

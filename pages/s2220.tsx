@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -7,8 +7,8 @@ import { pdfConformidadeASO } from '../lib/gerarPDF'
 import { getEmpresaId } from '../lib/empresa'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 export default function S2220() {
@@ -16,9 +16,9 @@ export default function S2220() {
   const [empresaId, setEmpresaId] = useState('')
   const [nomeEmpresa, setNomeEmpresa] = useState('')
   const [cnpjEmpresa, setCnpjEmpresa] = useState('')
-  const [funcionarios, setFuncionarios] = useState([])
-  const [asos, setAsos] = useState([])
-  const [transmissoes, setTransmissoes] = useState([])
+  const [funcionarios, setFuncionarios] = useState<any[]>([])
+  const [asos, setAsos] = useState<any[]>([])
+  const [transmissoes, setTransmissoes] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState('todos')
   const [sucesso, setSucesso] = useState('')
@@ -56,22 +56,22 @@ export default function S2220() {
     setCarregando(false)
   }
 
-  function ultimoAso(funcId) {
+  function ultimoAso(funcId: string) {
     return asos
       .filter(a => a.funcionario_id === funcId)
-      .sort((a,b) => new Date(b.data_exame) - new Date(a.data_exame))[0] || null
+      .sort((a,b) => new Date(b.data_exame).getTime() - new Date(a.data_exame).getTime())[0] || null
   }
 
-  function ultimaTx(funcId) {
+  function ultimaTx(funcId: string) {
     return transmissoes.filter(t => t.funcionario_id === funcId)[0] || null
   }
 
-  function diasParaVencer(d) {
+  function diasParaVencer(d: string | null) {
     if (!d) return null
-    return Math.round((new Date(d) - new Date()) / 86400000)
+    return Math.round((new Date(d).getTime() - Date.now()) / 86400000)
   }
 
-  function statusFuncionario(func) {
+  function statusFuncionario(func: any) {
     const aso   = ultimoAso(func.id)
     const tx    = ultimaTx(func.id)
     const dadosOk = func.data_adm && func.data_nasc &&
@@ -295,7 +295,7 @@ export default function S2220() {
   )
 }
 
-const s = {
+const s: Record<string, CSSProperties> = {
   loading:    { display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', fontFamily:'sans-serif', fontSize:14, color:'#6b7280' },
   header:     { display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1.25rem' },
   titulo:     { fontSize:18, fontWeight:700, color:'#111' },
