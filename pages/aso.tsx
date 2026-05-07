@@ -79,7 +79,7 @@ function codigoDeExame(nome: string): string {
 
 export default function Aso() {
   const router = useRouter()
-  const [empresaId, setEmpresaId] = useState('')
+  const [_empresaId, setEmpresaId] = useState('')
   const [asos, setAsos] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState('todos')

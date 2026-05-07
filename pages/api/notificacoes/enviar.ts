@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const resultado = await processarEmpresa(eId)
       resultados.push(resultado)
-    } catch (err: any) {
+    } catch {
       resultados.push({ empresa_id: eId, pendencias: 0, enviado: false })
     }
   }

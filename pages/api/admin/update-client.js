@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   if (authErr || !user) return res.status(401).json({ erro: 'Sessão inválida' })
   if (user.email !== adminEmail) return res.status(403).json({ erro: 'Acesso restrito' })
 
-  const { empresa_id, plano, bloqueado, observacao } = req.body
+  const { empresa_id, plano, bloqueado, observacao: _observacao } = req.body
 
   if (!empresa_id) return res.status(400).json({ erro: 'empresa_id obrigatório' })
   if (plano && !PLANOS_VALIDOS.includes(plano)) {

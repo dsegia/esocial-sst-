@@ -77,7 +77,7 @@ export default async function handler(req, res) {
     })
   }
 
-  const { xml_assinado, cnpj_empregador, ambiente = 'producao_restrita', transmissao_id } = req.body
+  const { xml_assinado, cnpj_empregador, ambiente = 'producao_restrita', transmissao_id: _transmissao_id } = req.body
 
   if (!xml_assinado || !cnpj_empregador) {
     return res.status(400).json({ erro: 'XML assinado e CNPJ são obrigatórios' })
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
   if (!endpoint) return res.status(400).json({ erro: 'Ambiente inválido' })
 
   try {
-    const nrLote = Date.now().toString()
+    const _nrLote = Date.now().toString()
     const dataHoraTransmissao = new Date().toISOString()
 
     const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>

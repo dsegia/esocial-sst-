@@ -722,7 +722,7 @@ export default function Admin() {
               }
 
               const corStatus: Record<string, string> = { verde: '#27a048', amarelo: '#EF9F27', vermelho: '#dc2626', cinza: '#9ca3af' }
-              const bgStatus:  Record<string, string> = { verde: '#EAF3DE', amarelo: '#FAEEDA', vermelho: '#FCEBEB', cinza: '#f3f4f6' }
+              const _bgStatus: Record<string, string> = { verde: '#EAF3DE', amarelo: '#FAEEDA', vermelho: '#FCEBEB', cinza: '#f3f4f6' }
 
               return (
                 <>

@@ -179,6 +179,7 @@ export default function TransmissaoManual() {
           body: JSON.stringify({
             tipo: txCompleta.evento,
             dados: dadosEvento,
+            funcionario: txCompleta.funcionarios,
             empresa: { cnpj: empresa.cnpj },
             ambiente,
           })

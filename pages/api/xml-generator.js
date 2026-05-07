@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   const { limited, retryAfter } = checkRateLimit(ip, { windowMs: 60_000, max: 20 })
   if (limited) return res.status(429).json({ erro: 'Muitas requisições. Tente novamente em breve.', retryAfter })
 
-  const { tipo, dados, empresa, ambiente = 'producao_restrita' } = req.body
+  const { tipo, dados, empresa, ambiente = 'producao_restrita', funcionario } = req.body
   if (!tipo || !dados || !empresa) return res.status(400).json({ erro: 'Dados incompletos' })
 
   // tpAmb: 1=Produção, 2=Produção Restrita (testes)
@@ -22,9 +22,9 @@ export default async function handler(req, res) {
 
   try {
     let xml = ''
-    if (tipo === 'S-2220') xml = gerarS2220(dados, empresa, tpAmb)
+    if (tipo === 'S-2220') xml = gerarS2220(dados, empresa, tpAmb, funcionario)
     else if (tipo === 'S-2240') xml = gerarS2240(dados, empresa, tpAmb)
-    else if (tipo === 'S-2210') xml = gerarS2210(dados, empresa, tpAmb)
+    else if (tipo === 'S-2210') xml = gerarS2210(dados, empresa, tpAmb, funcionario)
     else return res.status(400).json({ erro: 'Tipo inválido' })
 
     return res.status(200).json({ sucesso: true, xml })
@@ -88,14 +88,15 @@ function codigoExame(nomeExame) {
 }
 
 // ─── S-2220: MONITORAMENTO DA SAÚDE ──────────────────
-function gerarS2220(aso, empresa, tpAmb) {
+function gerarS2220(aso, empresa, tpAmb, funcionario = {}) {
   const cnpjEmp = cnpj(empresa.cnpj)
   const idEvt = id(cnpjEmp)
-  const func = aso.funcionario || {}
-  const dadosAso = aso.aso || {}
-  const exames = aso.exames || []
+  // Suporte a estrutura flat (row do DB) e aninhada (legado)
+  const func = aso.funcionario || funcionario || {}
+  const dadosAso = aso.aso || aso
+  const exames = aso.exames || dadosAso.exames || []
 
-  const examesXML = exames.map((ex, i) => `
+  const examesXML = exames.map((ex) => `
         <exame>
           <dtExm>${data(dadosAso.data_exame)}</dtExm>
           <procRealizado>
@@ -143,7 +144,8 @@ function gerarS2220(aso, empresa, tpAmb) {
 function gerarS2240(ltcat, empresa, tpAmb) {
   const cnpjEmp = cnpj(empresa.cnpj)
   const idEvt = id(cnpjEmp)
-  const geral = ltcat.dados_gerais || {}
+  // Suporte a estrutura flat (row do DB) e aninhada (legado)
+  const geral = ltcat.dados_gerais || ltcat
   const ghes = ltcat.ghes || []
 
   const TIPO_AGENTE = { fis: '01', qui: '02', bio: '03', erg: '04' }
@@ -209,10 +211,11 @@ function gerarS2240(ltcat, empresa, tpAmb) {
 }
 
 // ─── S-2210: CAT ─────────────────────────────────────
-function gerarS2210(cat, empresa, tpAmb) {
+function gerarS2210(cat, empresa, tpAmb, funcionario = {}) {
   const cnpjEmp = cnpj(empresa.cnpj)
   const idEvt = id(cnpjEmp)
-  const func = cat.funcionario || {}
+  // Suporte a estrutura flat (row do DB) e aninhada (legado)
+  const func = cat.funcionario || funcionario || {}
   const TIPO_CAT = { tipico: '1', doenca: '2', trajeto: '3' }
   const atend = cat.atendimento || {}
   // diagProvavel deve ser texto descritivo, não o código CID
