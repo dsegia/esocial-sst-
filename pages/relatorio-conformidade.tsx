@@ -259,7 +259,7 @@ export default function RelatorioConformidade() {
               </tr>
             </thead>
             <tbody>
-              {listaFiltrada.map((f, i) => {
+              {listaFiltrada.map((f, _i) => {
                 const aso = f.ultimoAso
                 const dataExame = aso?.data_exame
                   ? new Date(aso.data_exame + 'T12:00:00').toLocaleDateString('pt-BR')

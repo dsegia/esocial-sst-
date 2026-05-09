@@ -1,4 +1,5 @@
 import Head from 'next/head'
+import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
@@ -385,8 +386,8 @@ export default function Home() {
             <a href="#contato">Contato</a>
           </div>
           <div className="nav-cta">
-            <a href="/login" className="btn-ghost">Entrar</a>
-            <a href="/cadastro" className="btn-nav-cta">Testar grátis →</a>
+            <Link href="/login" className="btn-ghost">Entrar</Link>
+            <Link href="/cadastro" className="btn-nav-cta">Testar grátis →</Link>
           </div>
           <button className="nav-mobile-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
@@ -402,8 +403,8 @@ export default function Home() {
               </a>
             ))}
             <div style={{ display:'flex', gap:10, paddingTop:8, borderTop:'1px solid rgba(255,255,255,.06)' }}>
-              <a href="/login" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', fontSize:13, fontWeight:500, color:'#94a3b8', border:'1px solid rgba(255,255,255,.1)', borderRadius:8 }}>Entrar</a>
-              <a href="/cadastro" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', fontSize:13, fontWeight:600, color:'#fff', background:'linear-gradient(135deg,#185FA5,#3b82f6)', borderRadius:8 }}>Testar grátis</a>
+              <Link href="/login" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', fontSize:13, fontWeight:500, color:'#94a3b8', border:'1px solid rgba(255,255,255,.1)', borderRadius:8 }}>Entrar</Link>
+              <Link href="/cadastro" style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', fontSize:13, fontWeight:600, color:'#fff', background:'linear-gradient(135deg,#185FA5,#3b82f6)', borderRadius:8 }}>Testar grátis</Link>
             </div>
           </div>
         )}
@@ -428,10 +429,10 @@ export default function Home() {
               Importe PDF de LTCAT, PCMSO e ASO — a IA extrai e preenche tudo automaticamente.
             </p>
             <div className="hero-btns">
-              <a href="/cadastro" className="btn-cta-main">
+              <Link href="/cadastro" className="btn-cta-main">
                 Começar trial grátis
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9,18 15,12 9,6"/></svg>
-              </a>
+              </Link>
               <a href="#ia" className="btn-cta-sec">Ver como funciona</a>
             </div>
             <p className="hero-note">
@@ -665,7 +666,7 @@ export default function Home() {
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
-              <a href="/cadastro" className="price-btn price-btn-ghost">Começar grátis</a>
+              <Link href="/cadastro" className="price-btn price-btn-ghost">Começar grátis</Link>
             </div>
             {/* Starter */}
             <div className="price-card featured">
@@ -678,7 +679,7 @@ export default function Home() {
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
-              <a href="/cadastro" className="price-btn price-btn-main">Começar grátis</a>
+              <Link href="/cadastro" className="price-btn price-btn-main">Começar grátis</Link>
             </div>
             {/* Pro */}
             <div className="price-card">
@@ -690,7 +691,7 @@ export default function Home() {
                   <li key={i}><span className="chk">✓</span>{item}</li>
                 ))}
               </ul>
-              <a href="/cadastro" className="price-btn price-btn-ghost">Começar grátis</a>
+              <Link href="/cadastro" className="price-btn price-btn-ghost">Começar grátis</Link>
             </div>
           </div>
           <p style={{ textAlign:'center', marginTop:28, fontSize:12, color:'#334155' }}>
@@ -713,7 +714,7 @@ export default function Home() {
             ].map((t,i) => (
               <div key={i} className="testi-card">
                 <div className="testi-stars">★★★★★</div>
-                <p>"{t.text}"</p>
+                <p>&quot;{t.text}&quot;</p>
                 <div className="testi-author">
                   <div className="testi-avatar">{t.init}</div>
                   <div>
@@ -774,8 +775,8 @@ export default function Home() {
           14 dias para explorar todas as funcionalidades. Sem cartão de crédito, sem compromisso.
         </p>
         <div className="cta-btns">
-          <a href="/cadastro" className="btn-cta-main">Criar conta grátis</a>
-          <a href="/login" className="btn-cta-sec">Já tenho conta — entrar</a>
+          <Link href="/cadastro" className="btn-cta-main">Criar conta grátis</Link>
+          <Link href="/login" className="btn-cta-sec">Já tenho conta — entrar</Link>
         </div>
         <p className="cta-note">Suporte em até 24h · Dados hospedados no Brasil · LGPD</p>
       </section>
@@ -802,9 +803,9 @@ export default function Home() {
             <div className="footer-col">
               <h4>Conta</h4>
               <ul>
-                <li><a href="/login">Entrar</a></li>
-                <li><a href="/cadastro">Criar conta</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
+                <li><Link href="/login">Entrar</Link></li>
+                <li><Link href="/cadastro">Criar conta</Link></li>
+                <li><Link href="/dashboard">Dashboard</Link></li>
               </ul>
             </div>
             <div className="footer-col">

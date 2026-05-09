@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
 import { setEmpresaId, setMultiEmpresa } from '../lib/empresa'
 
@@ -189,9 +190,9 @@ export default function Login() {
 
           <div style={s.rodape}>
             Não tem conta?{' '}
-            <a href="/cadastro" style={{ color: '#185FA5', fontWeight: 500, textDecoration: 'none' }}>
+            <Link href="/cadastro" style={{ color: '#185FA5', fontWeight: 500, textDecoration: 'none' }}>
               Criar conta grátis — trial 14 dias
-            </a>
+            </Link>
           </div>
 
         </div>

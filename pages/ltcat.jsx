@@ -28,7 +28,7 @@ const epcVazio    = () => ({ nome:'', eficaz:true })
 
 export default function LTCAT() {
   const router = useRouter()
-  const [empresaId, setEmpresaId] = useState('')
+  const [_empresaId, setEmpresaId] = useState('')
   const [nomeEmpresa, setNomeEmpresa] = useState('')
   const [cnpjEmpresa, setCnpjEmpresa] = useState('')
   const [ltcats, setLtcats] = useState([])
@@ -328,7 +328,7 @@ export default function LTCAT() {
                       </div>
                       {ghe && (ghe.epi||[]).length > 0 && (
                         <button onClick={() => {
-                          const funcsDoGhe = todosFunc.filter(f =>
+                          const _funcsDoGhe = todosFunc.filter(f =>
                             (f.setor||'').toLowerCase().includes((ghe.setor||'').toLowerCase()) ||
                             (ghe.funcoes||[]).some(fn => (f.funcao||'').toLowerCase().includes(fn.toLowerCase()))
                           )
@@ -390,7 +390,7 @@ export default function LTCAT() {
                           ])]
                           if (!todasFuncoes.length && !fncsVinculadas.length) return (
                             <div style={{ marginBottom:12, padding:'8px 12px', background:'#FAEEDA', borderRadius:8, fontSize:12, color:'#633806' }}>
-                              ⚠ Nenhuma função associada a este GHE. Clique em "Editar LTCAT" para adicionar.
+                              ⚠ Nenhuma função associada a este GHE. Clique em &quot;Editar LTCAT&quot; para adicionar.
                             </div>
                           )
                           return (

@@ -3,7 +3,6 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
 import Layout from '../components/Layout'
-import { pdfPCMSO } from '../lib/gerarPDF'
 import { gerarPdfPcmso } from '../lib/gerar-pdf'
 import { getEmpresaId } from '../lib/empresa'
 
@@ -341,7 +340,7 @@ export default function PCMSO() {
                   const st = statusAso(aso)
                   const prog = programa.find(p => p.funcao === f.funcao && (!p.setor || p.setor === f.setor))
                     || programa.find(p => p.funcao === f.funcao)
-                  const agentes = agentesDoFuncionario(f)
+                  const _agentes = agentesDoFuncionario(f)
                   return (
                     <tr key={f.id} style={{ borderBottom:'0.5px solid #f3f4f6' }}>
                       <td style={s.td}>

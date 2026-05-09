@@ -70,7 +70,7 @@ const PLANOS = [
 export default function Planos() {
   const router = useRouter()
   const [planoAtual, setPlanoAtual] = useState<string>('trial')
-  const [empresaId, setEmpresaId] = useState('')
+  const [_empresaId, setEmpresaId] = useState('')
   const [trialRestante, setTrialRestante] = useState<number | null>(null)
   const [creditosRestantes, setCreditosRestantes] = useState<number | null>(null)
   const [creditosIncluidos, setCreditosIncluidos] = useState<number>(0)
